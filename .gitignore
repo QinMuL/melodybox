@@ -29,3 +29,13 @@ backend/data/melodybox.db-journal
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# 测试文件
+测试文件/
+*.flac
+*.mp3
+*.wav
+*.m4a
+*.ogg
+*.aac
+*.ape
