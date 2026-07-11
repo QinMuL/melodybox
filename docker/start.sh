@@ -7,7 +7,7 @@ echo "启动 MelodyBox 音律盒子..."
 
 # 启动 FastAPI 后端（后台运行）
 cd /app/backend
-uvicorn app.main:app \
+python -m uvicorn app.main:app \
     --host 127.0.0.1 \
     --port 28081 \
     --log-level info &
