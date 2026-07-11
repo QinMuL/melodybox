@@ -117,3 +117,19 @@ export interface Paginated<T> {
   items: T[];
   total: number;
 }
+
+// 系统日志相关类型
+export interface LogEntry {
+  time: string;
+  level: string;
+  logger: string;
+  message: string;
+  raw: string;
+}
+
+export interface LogListResponse {
+  total: number;
+  file: string;
+  fileSize: number;
+  entries: LogEntry[];
+}

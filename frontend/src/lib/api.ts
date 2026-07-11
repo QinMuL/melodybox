@@ -4,6 +4,7 @@ import type {
   Artist,
   DuplicateGroup,
   LibraryStats,
+  LogListResponse,
   OrganizeConfig,
   OrganizeTask,
   Paginated,
@@ -152,5 +153,28 @@ export const api = {
             .then((r) => r.data),
         { accessible: false, error: "开发模式：无法访问目录" }
       ),
+  },
+
+  // 系统日志
+  logs: {
+    list: (params: { level?: string; search?: string; limit?: number }) =>
+      withFallback(
+        () =>
+          client
+            .get<LogListResponse>("/logs/", { params })
+            .then((r) => r.data),
+        {
+          total: 0,
+          file: "/app/data/logs/melodybox.log",
+          fileSize: 0,
+          entries: [],
+        }
+      ),
+    files: () =>
+      withFallback(
+        () => client.get<string[]>("/logs/files").then((r) => r.data),
+        ["melodybox.log"]
+      ),
+    clear: () => client.delete("/logs/").then((r) => r.data),
   },
 };

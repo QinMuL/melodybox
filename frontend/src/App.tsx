@@ -4,6 +4,7 @@ import Dashboard from "@/pages/Dashboard";
 import Library from "@/pages/Library";
 import Organize from "@/pages/Organize";
 import Duplicates from "@/pages/Duplicates";
+import Logs from "@/pages/Logs";
 import Settings from "@/pages/Settings";
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="/library" element={<Library />} />
           <Route path="/organize" element={<Organize />} />
           <Route path="/duplicates" element={<Duplicates />} />
+          <Route path="/logs" element={<Logs />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
       </Routes>

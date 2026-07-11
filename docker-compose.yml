@@ -9,8 +9,14 @@ services:
     ports:
       - "28080:28080"
     volumes:
-      # 音乐目录映射（请修改左侧为实际 NAS 音乐目录路径）
-      - /path/to/your/music:/music:rw
+      # 音乐目录映射（支持多个目录，挂载到 /music/ 下不同子目录）
+      # 后端会递归扫描 /music 下所有音频文件，无需改代码
+      # 示例：NAS 上有 3 个音乐目录，分别挂载到 /music 下的子目录
+      - /path/to/your/music1:/music/library1:rw
+      - /path/to/your/music2:/music/library2:rw
+      - /path/to/your/music3:/music/library3:rw
+      # 如果只有一个目录，保留一行即可：
+      # - /path/to/your/music:/music:rw
       # 数据持久化（SQLite 数据库）
       - ./data:/app/data:rw
     environment:
@@ -27,3 +33,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    # Docker 日志驱动轮转（防止 stdout 日志无限增长）
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

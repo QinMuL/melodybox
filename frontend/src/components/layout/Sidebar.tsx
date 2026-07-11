@@ -7,6 +7,7 @@ import {
   Settings,
   Music4,
   ChevronLeft,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store/useStore";
@@ -16,6 +17,7 @@ const navItems = [
   { to: "/library", icon: Library, label: "音乐库" },
   { to: "/organize", icon: Wand2, label: "整理中心" },
   { to: "/duplicates", icon: Copy, label: "去重管理" },
+  { to: "/logs", icon: ScrollText, label: "系统日志" },
   { to: "/settings", icon: Settings, label: "系统设置" },
 ];
 

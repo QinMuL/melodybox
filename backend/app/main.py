@@ -7,21 +7,43 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from logging.handlers import RotatingFileHandler
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import duplicates, library, organize, settings as settings_api, websocket
-from app.config import settings
+from app.api import duplicates, library, logs, organize, settings as settings_api, websocket
+from app.config import settings, DATA_DIR
 from app.database import init_db
 from app.services.task_manager import task_manager
 
-# 配置日志
-logging.basicConfig(
-    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+# 配置日志：同时输出到 stdout 和文件（轮转 10MB × 5 份）
+_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+_LOG_LEVEL = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+
+# 确保日志目录存在
+_LOG_DIR = DATA_DIR / "logs"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
+_LOG_FILE = _LOG_DIR / "melodybox.log"
+
+# 根日志配置
+_root = logging.getLogger()
+_root.setLevel(_LOG_LEVEL)
+# 清理默认 handler
+for _h in list(_root.handlers):
+    _root.removeHandler(_h)
+# stdout handler（Docker 收集）
+_stream = logging.StreamHandler()
+_stream.setFormatter(logging.Formatter(_LOG_FORMAT))
+_root.addHandler(_stream)
+# 文件 handler（轮转：10MB × 5 份，UTF-8）
+_file = RotatingFileHandler(
+    _LOG_FILE, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
 )
+_file.setFormatter(logging.Formatter(_LOG_FORMAT))
+_root.addHandler(_file)
+
 logger = logging.getLogger("melodybox")
 
 
@@ -62,6 +84,7 @@ def create_app() -> FastAPI:
     app.include_router(organize.router, prefix="/api")
     app.include_router(duplicates.router, prefix="/api")
     app.include_router(settings_api.router, prefix="/api")
+    app.include_router(logs.router, prefix="/api")
     app.include_router(websocket.router, prefix="/api")
 
     # 健康检查
