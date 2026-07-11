@@ -103,9 +103,12 @@ export const api = {
             .then((r) => r.data),
         { taskId: "mock-scan-001", status: "pending" }
       ),
-    scanStatus: () =>
+    scanStatus: (taskId?: string) =>
       withFallback(
-        () => client.get("/library/scan/status").then((r) => r.data),
+        () =>
+          client
+            .get<OrganizeTask>("/library/scan/status", { params: { taskId } })
+            .then((r) => r.data),
         null
       ),
   },
@@ -119,15 +122,15 @@ export const api = {
       ),
     updateConfig: (config: OrganizeConfig) =>
       client.put("/organize/config", config).then((r) => r.data),
-    preview: () =>
+    preview: (mode: "rename" | "organize" = "organize") =>
       withFallback(
         () =>
-          client.post<PreviewResult>("/organize/preview", { dryRun: true }).then((r) => r.data),
+          client.post<PreviewResult>("/organize/preview", { mode }).then((r) => r.data),
         mockData.previewResult
       ),
-    start: (dryRun = false) =>
+    start: (mode: "rename" | "organize" = "organize") =>
       withFallback(
-        () => client.post<{ taskId: string }>("/organize/start", { dryRun }).then((r) => r.data),
+        () => client.post<{ taskId: string }>("/organize/start", { mode }).then((r) => r.data),
         { taskId: "mock-task-001" }
       ),
     task: (taskId: string) =>

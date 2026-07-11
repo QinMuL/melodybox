@@ -63,6 +63,7 @@ export interface PreviewChange {
 export interface PreviewResult {
   changes: PreviewChange[];
   totalChanges: number;
+  skipped: number;
 }
 
 export type TaskStatus = "pending" | "running" | "completed" | "failed";
@@ -85,6 +86,7 @@ export interface OrganizeTask {
   logs: TaskLog[];
   startedAt: string;
   completedAt?: string;
+  result?: Record<string, number | string>;
 }
 
 export interface DuplicateFile {

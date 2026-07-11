@@ -1,13 +1,16 @@
 """文件整理业务逻辑。
 
-扫描输入目录、读取元数据、按命名模板渲染新文件名，
-将文件按"艺术家/专辑/歌曲"结构移动或复制。
+支持两种独立操作：
+1. rename（文件命名）：基于元数据重命名文件，不移动位置。格式：艺术家 - 歌曲名.扩展名
+2. organize（文件整理）：按 艺术家/专辑/ 结构归类移动文件，不改文件名。
+
 使用 asyncio + ThreadPoolExecutor 实现非阻塞任务。
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any, Dict, List
@@ -32,8 +35,10 @@ from app.utils.naming import render_template
 
 logger = logging.getLogger(__name__)
 
-# 默认模板
-DEFAULT_TEMPLATE = "{artist}/{album}/{track:02d}-{title}.{ext}"
+# 命名模板（rename 模式）：只改文件名，不创建子目录
+RENAME_TEMPLATE = "{artist} - {title}.{ext}"
+# 整理模板（organize 模式）：按艺术家/专辑/归类，保留原文件名
+ORGANIZE_TEMPLATE = "{artist}/{album}/{filename}"
 
 
 def _build_render_data(metadata: Dict[str, Any], file_path: str) -> Dict[str, Any]:
@@ -47,24 +52,66 @@ def _build_render_data(metadata: Dict[str, Any], file_path: str) -> Dict[str, An
         "track_number": metadata.get("track_number"),
         "year": metadata.get("year"),
         "ext": get_audio_format(file_path) or "mp3",
+        "filename": os.path.basename(file_path),  # 原文件名（organize 模式保留）
     }
+
+
+def _compute_target(
+    file_path: str,
+    metadata: Dict[str, Any],
+    mode: str,
+    output_dir: str,
+    naming_template: str | None = None,
+) -> str:
+    """根据模式计算目标路径。
+
+    Args:
+        file_path: 源文件路径
+        metadata: 元数据字典
+        mode: "rename"（只重命名）或 "organize"（只归类移动）
+        output_dir: 输出根目录
+        naming_template: 自定义模板（可选）
+
+    Returns:
+        目标文件绝对路径
+    """
+    data = _build_render_data(metadata, file_path)
+
+    if mode == "rename":
+        # rename 模式：在原目录中重命名，不移动
+        template = naming_template or RENAME_TEMPLATE
+        new_name = render_template(template, data)
+        # 新文件名可能包含子目录分隔符，取 basename
+        new_name = os.path.basename(new_name)
+        return os.path.join(os.path.dirname(file_path), new_name)
+    else:
+        # organize 模式：移动到 艺术家/专辑/ 下，保留原文件名
+        template = naming_template or ORGANIZE_TEMPLATE
+        target_rel = render_template(template, data)
+        return os.path.join(output_dir, target_rel)
 
 
 def _decide_target(
     source: str,
-    target_rel: str,
-    output_dir: str,
+    target: str,
     move: bool,
     policy: str,
 ) -> tuple[str, str, str | None]:
     """根据冲突策略决定最终目标路径与动作。
 
+    Args:
+        source: 源文件路径
+        target: 计算出的目标路径
+        move: 是否移动（True=move，False=copy）
+        policy: 冲突策略 skip/overwrite/rename
+
     Returns:
         (final_target, action, reason)
     """
-    import os
+    # 源和目标相同，跳过
+    if os.path.abspath(source) == os.path.abspath(target):
+        return target, "skip", "文件名已符合规范"
 
-    target = os.path.join(output_dir, target_rel)
     action = "move" if move else "copy"
 
     if not os.path.exists(target):
@@ -74,35 +121,46 @@ def _decide_target(
     if policy == "skip":
         return target, "skip", "目标文件已存在（skip）"
     if policy == "overwrite":
-        return target, action, None  # 调用方负责覆盖
-    # rename：生成不冲突路径
+        return target, action, None
+    # rename 策略：生成不冲突路径
     target_path = unique_path(type(target)(target))
-    return str(target_path), action, "目标已存在，重命名"
+    return str(target_path), action, "目标已存在，自动重命名"
 
 
 def preview(
     input_dir: str,
     output_dir: str,
-    naming_template: str = DEFAULT_TEMPLATE,
+    mode: str = "organize",
+    naming_template: str | None = None,
     move: bool = False,
     policy: str = "skip",
     exclude_patterns: List[str] | None = None,
 ) -> List[PreviewItem]:
     """预览整理结果（dry-run，不实际操作文件）。
 
+    Args:
+        input_dir: 输入目录
+        output_dir: 输出目录
+        mode: "rename"（只重命名）或 "organize"（只归类移动）
+        naming_template: 自定义命名模板
+        move: True=移动，False=复制
+        policy: 冲突策略 skip/overwrite/rename
+        exclude_patterns: 排除模式列表
+
     Returns:
         PreviewItem 列表
     """
     items: List[PreviewItem] = []
     files = find_audio_files(input_dir, exclude_patterns)
-    template = naming_template or DEFAULT_TEMPLATE
 
     for file_path in files:
         metadata = metadata_service.read_metadata(file_path)
         data = _build_render_data(metadata, file_path)
-        target_rel = render_template(template, data)
+        target = _compute_target(
+            file_path, metadata, mode, output_dir, naming_template
+        )
         final_target, action, reason = _decide_target(
-            file_path, target_rel, output_dir, move, policy
+            file_path, target, move, policy
         )
         items.append(
             PreviewItem(
@@ -131,23 +189,22 @@ def _process_single_file(
     Returns:
         (final_target, error_message)
     """
-    import os
-
     try:
         if action == "skip":
             return target, None
+
+        # 确保目标目录存在
+        os.makedirs(os.path.dirname(target), exist_ok=True)
 
         # 目标存在时的覆盖处理
         if os.path.exists(target):
             if policy == "skip":
                 return target, None
             if policy == "overwrite":
-                # 删除已存在的目标
                 try:
                     os.remove(target)
                 except OSError:
                     pass
-            # rename 策略已由 _decide_target 生成新路径
 
         if move:
             move_file(source, target)
@@ -167,7 +224,7 @@ async def run_organize_task(
 
     Args:
         task_id: 任务 ID
-        config: 整理配置字典
+        config: 整理配置字典，需包含 mode 字段（"rename" 或 "organize"）
         db_session_factory: 返回新数据库会话的可调用对象
 
     Returns:
@@ -175,7 +232,13 @@ async def run_organize_task(
     """
     input_dir = config.get("inputDir") or config.get("input_dir") or ""
     output_dir = config.get("outputDir") or config.get("output_dir") or ""
-    template = config.get("namingTemplate") or DEFAULT_TEMPLATE
+    mode = config.get("mode", "organize")  # rename 或 organize
+    # 模式默认模板：rename 用扁平文件名，organize 用目录结构。不使用 config 中保存的旧模板。
+    naming_template = config.get("namingTemplate")
+    if mode == "rename":
+        naming_template = naming_template or RENAME_TEMPLATE
+    else:
+        naming_template = naming_template or ORGANIZE_TEMPLATE
     move = bool(config.get("moveInsteadOfCopy", config.get("move", False)))
     policy = config.get("overwritePolicy", config.get("overwrite_policy", "skip"))
     exclude_patterns = config.get("excludePatterns") or []
@@ -185,9 +248,12 @@ async def run_organize_task(
     skipped = 0
     failed = 0
 
-    # 扫描文件（同步，通常较快）
+    # 扫描文件
     files = find_audio_files(input_dir, exclude_patterns)
     total = len(files)
+
+    action_desc = "重命名" if mode == "rename" else "整理归类"
+    logger.info("开始%s任务，共 %d 个文件", action_desc, total)
 
     db = db_session_factory()
     try:
@@ -195,7 +261,7 @@ async def run_organize_task(
         task = db.query(OrganizeTask).filter(OrganizeTask.id == task_id).first()
         if task is not None:
             task.status = "running"
-            task.started_at = datetime.utcnow()
+            task.started_at = datetime.now()
             task.total_files = total
             task.processed_files = 0
             task.progress = 0.0
@@ -208,9 +274,10 @@ async def run_organize_task(
             processed_files=0,
             current_file=None,
         )
-        await task_manager.send_log(task_id, "info", f"开始整理任务，共 {total} 个文件")
+        await task_manager.send_log(
+            task_id, "info", f"开始{action_desc}任务，共 {total} 个文件"
+        )
 
-        # 使用线程池执行阻塞的文件 IO
         loop = asyncio.get_event_loop()
         with ThreadPoolExecutor(max_workers=4) as executor:
             for idx, file_path in enumerate(files, start=1):
@@ -218,10 +285,12 @@ async def run_organize_task(
                 metadata = await loop.run_in_executor(
                     executor, metadata_service.read_metadata, file_path
                 )
-                data = _build_render_data(metadata, file_path)
-                target_rel = render_template(template, data)
+                # 计算目标路径
+                target = _compute_target(
+                    file_path, metadata, mode, output_dir, naming_template
+                )
                 final_target, action, reason = _decide_target(
-                    file_path, target_rel, output_dir, move, policy
+                    file_path, target, move, policy
                 )
 
                 # 执行文件操作
@@ -246,6 +315,9 @@ async def run_organize_task(
                     ))
                 elif action == "skip":
                     skipped += 1
+                    await task_manager.send_log(
+                        task_id, "info", f"跳过 {file_path}：{reason}"
+                    )
                 elif action == "move":
                     moved += 1
                 else:
@@ -261,7 +333,7 @@ async def run_organize_task(
                     current_file=file_path,
                 )
 
-                # 持久化进度（每处理一个文件更新一次）
+                # 持久化进度
                 if task is not None:
                     task.processed_files = idx
                     task.progress = progress
@@ -270,6 +342,7 @@ async def run_organize_task(
 
         # 任务完成
         result = {
+            "mode": mode,
             "moved": moved,
             "copied": copied,
             "skipped": skipped,
@@ -281,20 +354,22 @@ async def run_organize_task(
             task.progress = 100.0
             task.processed_files = total
             task.current_file = None
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now()
             task.result = result
             db.commit()
         await task_manager.send_log(
             task_id, "info",
-            f"整理完成：移动 {moved}，复制 {copied}，跳过 {skipped}，失败 {failed}",
+            f"{action_desc}完成：移动 {moved}，复制 {copied}，跳过 {skipped}，失败 {failed}",
         )
+        logger.info("%s任务完成: 移动=%d 复制=%d 跳过=%d 失败=%d",
+                    action_desc, moved, copied, skipped, failed)
         return result
     except Exception as exc:  # noqa: BLE001
-        logger.exception("整理任务异常: %s", task_id)
+        logger.exception("%s任务异常: %s", action_desc, task_id)
         task = db.query(OrganizeTask).filter(OrganizeTask.id == task_id).first()
         if task is not None:
             task.status = "failed"
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now()
             task.result = {"error": str(exc)}
             db.commit()
         db.add(TaskLog(task_id=task_id, level="error", message=f"任务异常: {exc}"))

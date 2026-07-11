@@ -1,16 +1,19 @@
 """音乐库查询路由 /api/library。"""
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.config import load_organize_config
 from app.database import SessionLocal, get_db
-from app.models import Album, Artist, DuplicateGroup, OrganizeTask, Song
+from app.models import Album, Artist, DuplicateGroup, OrganizeTask, Song, SongArtist
 from app.schemas import (
     AlbumListResponse,
     ArtistItem,
@@ -52,9 +55,10 @@ def get_stats(db: Session = Depends(get_db)) -> StatsResponse:
         .group_by(Song.format)
         .all()
     )
-    format_breakdown = {
-        (fmt or "unknown"): count for fmt, count in format_rows
-    }
+    format_breakdown = [
+        {"format": fmt or "unknown", "count": count}
+        for fmt, count in format_rows
+    ]
 
     return StatsResponse(
         total_songs=total_songs,
@@ -99,13 +103,31 @@ def list_artist_albums(
     artist_id: str,
     db: Session = Depends(get_db),
 ) -> AlbumListResponse:
-    """获取指定艺术家的专辑列表。"""
+    """获取指定艺术家的专辑列表。
+
+    基于多对多关联：返回该艺人参与的所有歌曲所在的专辑（去重），
+    因此合作艺人也能看到他/她参与的合作专辑。
+    """
     artist = db.query(Artist).filter(Artist.id == artist_id).first()
     if artist is None:
         raise HTTPException(status_code=404, detail="艺术家不存在")
+
+    # 通过 song_artists 找该艺人参与的所有歌曲 id
+    song_ids_subq = (
+        db.query(SongArtist.song_id)
+        .filter(SongArtist.artist_id == artist_id)
+        .subquery()
+    )
+    # 这些歌曲所在的不同专辑 id
+    album_ids_subq = (
+        db.query(Song.album_id)
+        .filter(Song.id.in_(song_ids_subq))
+        .distinct()
+        .subquery()
+    )
     albums = (
         db.query(Album)
-        .filter(Album.artist_id == artist_id)
+        .filter(Album.id.in_(album_ids_subq))
         .order_by(Album.year.asc().nullslast(), Album.title_normalized.asc())
         .all()
     )
@@ -282,15 +304,97 @@ def scan_library(
 
 @router.get("/scan/status", response_model=TaskStatusResponse)
 def get_scan_status(
+    taskId: Optional[str] = Query(None, description="任务ID；不传则返回最新一次扫描任务"),
     db: Session = Depends(get_db),
 ) -> TaskStatusResponse:
-    """查询最新扫描任务状态。"""
-    task = (
-        db.query(OrganizeTask)
-        .filter(OrganizeTask.task_type == "scan")
-        .order_by(OrganizeTask.created_at.desc())
-        .first()
-    )
+    """查询扫描任务状态。
+
+    - 传 taskId：返回指定任务
+    - 不传：返回最新一次扫描任务
+    """
+    query = db.query(OrganizeTask).filter(OrganizeTask.task_type == "scan")
+    if taskId:
+        query = query.filter(OrganizeTask.id == taskId)
+    task = query.order_by(OrganizeTask.created_at.desc()).first()
     if task is None:
         raise HTTPException(status_code=404, detail="尚无扫描任务")
     return TaskStatusResponse.model_validate(task)
+
+
+def _find_cover_file(album_id: str) -> Optional[Path]:
+    """查找专辑封面文件。"""
+    from app.config import DATA_DIR
+
+    covers_dir = DATA_DIR / "covers"
+    for ext in [".jpg", ".png", ".jpeg", ".webp"]:
+        p = covers_dir / f"{album_id}{ext}"
+        if p.exists():
+            return p
+    return None
+
+
+def _find_artist_avatar_file(artist_id: str) -> Optional[Path]:
+    """查找艺术家头像文件（MusicBrainz/Wikipedia 获取的真实头像）。"""
+    from app.config import DATA_DIR
+
+    avatars_dir = DATA_DIR / "covers" / "artists"
+    for ext in [".jpg", ".png", ".jpeg", ".webp"]:
+        p = avatars_dir / f"{artist_id}{ext}"
+        if p.exists():
+            return p
+    return None
+
+
+@router.get("/albums/{album_id}/cover")
+def get_album_cover(album_id: str, db: Session = Depends(get_db)):
+    """返回专辑封面图片。"""
+    album = db.query(Album).filter(Album.id == album_id).first()
+    if album is None:
+        raise HTTPException(status_code=404, detail="专辑不存在")
+    cover = _find_cover_file(album_id)
+    if cover is None:
+        raise HTTPException(status_code=404, detail="无封面图")
+    media_type = "image/png" if cover.suffix.lower() == ".png" else "image/jpeg"
+    return FileResponse(str(cover), media_type=media_type)
+
+
+@router.get("/artists/{artist_id}/avatar")
+def get_artist_avatar(artist_id: str, db: Session = Depends(get_db)):
+    """返回艺术家头像。优先返回真实头像，无则生成首字母 SVG。"""
+    artist = db.query(Artist).filter(Artist.id == artist_id).first()
+    if artist is None:
+        raise HTTPException(status_code=404, detail="艺术家不存在")
+
+    # 优先返回真实头像
+    avatar = _find_artist_avatar_file(artist_id)
+    if avatar is not None:
+        media_type = "image/png" if avatar.suffix.lower() == ".png" else "image/jpeg"
+        return FileResponse(str(avatar), media_type=media_type)
+
+    # 回退：生成首字母 SVG
+    name = artist.name or "U"
+    initial = name[0].upper() if name else "U"
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#31C27C"/>
+      <stop offset="100%" stop-color="#1A9B5F"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" fill="url(#bg)"/>
+  <text x="100" y="100" font-size="100" font-family="sans-serif" fill="white" text-anchor="middle" dominant-baseline="central" font-weight="bold">{initial}</text>
+</svg>'''
+    return Response(content=svg, media_type="image/svg+xml")
+
+
+@router.post("/artists/{artist_id}/fetch-avatar")
+def fetch_artist_avatar(artist_id: str, db: Session = Depends(get_db)):
+    """手动触发获取艺术家头像（MusicBrainz + Wikipedia）。"""
+    from app.services.artist_image_service import save_artist_avatar
+
+    artist = db.query(Artist).filter(Artist.id == artist_id).first()
+    if artist is None:
+        raise HTTPException(status_code=404, detail="艺术家不存在")
+
+    success = save_artist_avatar(artist_id, artist.name)
+    return {"success": success, "artist": artist.name}

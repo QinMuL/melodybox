@@ -130,7 +130,7 @@ def detect_duplicates(
                 group_hash=group_hash,
                 similarity=100.0,
                 status="pending",
-                detected_at=datetime.utcnow(),
+                detected_at=datetime.now(),
             ))
             grouped_song_ids.add(song.id)
         duplicate_count += len(group)
@@ -166,7 +166,7 @@ def detect_duplicates(
                     _group_avg_duration(group),
                 ),
                 status="pending",
-                detected_at=datetime.utcnow(),
+                detected_at=datetime.now(),
             ))
             duplicate_count += 1
         group_count += 1
@@ -207,7 +207,7 @@ async def run_duplicate_scan_task(
         task = db.query(OrganizeTask).filter(OrganizeTask.id == task_id).first()
         if task is not None:
             task.status = "running"
-            task.started_at = datetime.utcnow()
+            task.started_at = datetime.now()
             task.progress = 0.0
             db.commit()
 
@@ -243,7 +243,7 @@ async def run_duplicate_scan_task(
         if task is not None:
             task.status = "completed"
             task.progress = 100.0
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now()
             task.result = result
             db.commit()
         await task_manager.send_log(
@@ -256,7 +256,7 @@ async def run_duplicate_scan_task(
         task = db.query(OrganizeTask).filter(OrganizeTask.id == task_id).first()
         if task is not None:
             task.status = "failed"
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now()
             task.result = {"error": str(exc)}
             db.commit()
         db.add(TaskLog(task_id=task_id, level="error", message=f"任务异常: {exc}"))

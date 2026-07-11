@@ -46,7 +46,7 @@ class Artist(Base):
     cover_url = Column(String, nullable=True)
     album_count = Column(Integer, default=0, nullable=False)
     song_count = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
 
     albums = relationship("Album", back_populates="artist", cascade="all, delete-orphan")
 
@@ -63,7 +63,7 @@ class Album(Base):
     year = Column(Integer, nullable=True)
     cover_url = Column(String, nullable=True)
     song_count = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
 
     artist = relationship("Artist", back_populates="albums")
     songs = relationship("Song", back_populates="album", cascade="all, delete-orphan")
@@ -88,9 +88,24 @@ class Song(Base):
     file_hash = Column(String, nullable=True, index=True)  # MD5
     acoustic_fingerprint = Column(String, nullable=True)
     file_modified = Column(DateTime, nullable=True)
-    indexed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    indexed_at = Column(DateTime, default=datetime.now, nullable=False)
 
     album = relationship("Album", back_populates="songs")
+
+
+class SongArtist(Base):
+    """歌曲-艺术家多对多关联表。
+
+    一首歌可有多个艺术家（合作曲目），role 区分主艺人 / 合作艺人。
+    """
+
+    __tablename__ = "song_artists"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    song_id = Column(String, ForeignKey("songs.id"), nullable=False, index=True)
+    artist_id = Column(String, ForeignKey("artists.id"), nullable=False, index=True)
+    role = Column(String, default="primary", nullable=False)  # primary | featured
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
 
 
 class DuplicateGroup(Base):
@@ -103,7 +118,7 @@ class DuplicateGroup(Base):
     group_hash = Column(String, nullable=False, index=True)  # 组标识（hash 或模糊键）
     similarity = Column(Float, default=100.0, nullable=False)  # 0-100
     status = Column(String, default="pending", nullable=False)  # pending | resolved
-    detected_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    detected_at = Column(DateTime, default=datetime.now, nullable=False)
 
 
 class OrganizeTask(Base):
@@ -122,7 +137,7 @@ class OrganizeTask(Base):
     result = Column(JSON, nullable=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
 
     logs = relationship(
         "TaskLog", back_populates="task", cascade="all, delete-orphan"
@@ -138,6 +153,6 @@ class TaskLog(Base):
     task_id = Column(String, ForeignKey("organize_tasks.id"), nullable=False, index=True)
     level = Column(String, default="info", nullable=False)  # info|warning|error
     message = Column(Text, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=datetime.now, nullable=False)
 
     task = relationship("OrganizeTask", back_populates="logs")

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Music2,
@@ -12,6 +12,7 @@ import {
   Clock,
   HardDrive,
   ScanLine,
+  X,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatNumber, formatSize, formatRelativeTime } from "@/lib/format";
@@ -32,7 +33,9 @@ export default function Dashboard() {
   const [tasks, setTasks] = useState<OrganizeTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [activeTask, setActiveTask] = useState<OrganizeTask | null>(null);
   const [scanMsg, setScanMsg] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -47,22 +50,81 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData();
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    };
   }, []);
+
+  // 停止轮询
+  const stopPolling = () => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  };
+
+  // 启动轮询指定任务
+  const startPolling = (taskId: string) => {
+    stopPolling();
+    pollTimerRef.current = setInterval(async () => {
+      try {
+        const task = await api.library.scanStatus(taskId);
+        if (!task) return;
+        setActiveTask(task);
+        if (task.status === "completed") {
+          stopPolling();
+          setScanning(false);
+          const indexed = task.result?.indexed ?? 0;
+          const skipped = task.result?.skipped ?? 0;
+          setScanMsg({
+            type: "success",
+            text: `扫描完成：新入库 ${indexed} 个，跳过未修改 ${skipped} 个`,
+          });
+          setActiveTask(null);
+          // 立即刷新统计与任务列表
+          loadData();
+          // 8 秒后清空消息
+          setTimeout(() => setScanMsg(null), 8000);
+        } else if (task.status === "failed") {
+          stopPolling();
+          setScanning(false);
+          setScanMsg({
+            type: "error",
+            text: `扫描失败：${task.result?.error ?? "未知错误"}`,
+          });
+          setActiveTask(null);
+        }
+      } catch (err) {
+        // 轮询单次失败忽略，下次再试
+      }
+    }, 800);
+  };
 
   const handleScan = async () => {
     setScanning(true);
     setScanMsg({ type: "info", text: "扫描任务已提交..." });
     try {
       const res = await api.library.scan();
-      setScanMsg({ type: "success", text: `扫描已启动（任务ID: ${res.taskId.slice(0, 8)}），请稍后刷新查看结果` });
-      // 30 秒后自动刷新统计
-      setTimeout(loadData, 30000);
+      setScanMsg({
+        type: "info",
+        text: `扫描中（任务 ${res.taskId.slice(0, 8)}）...`,
+      });
+      // 立即拉一次状态，再启动轮询
+      const initial = await api.library.scanStatus(res.taskId);
+      if (initial) setActiveTask(initial);
+      startPolling(res.taskId);
     } catch (err) {
-      setScanMsg({ type: "error", text: `扫描失败: ${err instanceof Error ? err.message : String(err)}` });
-    } finally {
       setScanning(false);
-      setTimeout(() => setScanMsg(null), 8000);
+      setScanMsg({ type: "error", text: `扫描失败: ${err instanceof Error ? err.message : String(err)}` });
     }
+  };
+
+  // 手动取消轮询（不取消后端任务）
+  const handleCancelView = () => {
+    stopPolling();
+    setScanning(false);
+    setActiveTask(null);
+    setScanMsg(null);
   };
 
   const statItems: StatItem[] = stats
@@ -186,6 +248,36 @@ export default function Dashboard() {
         <p className="mt-3 text-xs text-ink-muted dark:text-ink-lightMuted">
           点击「扫描入库」会扫描输入目录下所有音频文件并入库到数据库，扫描完成后音乐库将显示艺术家和专辑列表
         </p>
+
+        {/* 扫描实时进度 */}
+        {activeTask && (
+          <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-900/40 dark:bg-sky-900/10">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-sky-700 dark:text-sky-300">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>扫描中 · {activeTask.processedFiles}/{activeTask.totalFiles} 文件 · {activeTask.progress.toFixed(1)}%</span>
+              </div>
+              <button
+                onClick={handleCancelView}
+                className="text-sky-600 transition-colors hover:text-sky-800 dark:text-sky-400"
+                title="关闭进度显示（不取消后端任务）"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-sky-100 dark:bg-sky-900/40">
+              <div
+                className="h-full bg-primary-gradient transition-all duration-300"
+                style={{ width: `${Math.min(100, activeTask.progress)}%` }}
+              />
+            </div>
+            {activeTask.currentFile && (
+              <p className="mt-2 truncate text-xs text-ink-muted dark:text-ink-lightMuted">
+                正在处理: {activeTask.currentFile}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

@@ -35,6 +35,12 @@ class MessageResponse(CamelModel):
 # ---------------- 音乐库 ----------------
 
 
+class FormatCount(CamelModel):
+    """格式分布项。"""
+    format: str
+    count: int
+
+
 class StatsResponse(CamelModel):
     """音乐库统计。"""
 
@@ -43,7 +49,7 @@ class StatsResponse(CamelModel):
     total_albums: int = 0
     total_duplicates: int = 0
     total_size: int = 0
-    format_breakdown: Dict[str, int] = Field(default_factory=dict)
+    format_breakdown: List[FormatCount] = Field(default_factory=list)
 
 
 class ArtistItem(CamelModel):
@@ -127,7 +133,7 @@ class OrganizeConfig(CamelModel):
     output_dir: str
     recycle_dir: str
     naming_template: str = "{artist}/{album}/{track:02d}-{title}.{ext}"
-    move_instead_of_copy: bool = False
+    move_instead_of_copy: bool = True
     overwrite_policy: str = "skip"  # skip | overwrite | rename
     exclude_patterns: List[str] = Field(default_factory=list)
 
@@ -137,6 +143,7 @@ class PreviewRequest(CamelModel):
 
     input_dir: Optional[str] = None
     output_dir: Optional[str] = None
+    mode: str = "organize"  # "rename"（只重命名）或 "organize"（只归类移动）
     naming_template: Optional[str] = None
     move_instead_of_copy: Optional[bool] = None
     overwrite_policy: Optional[str] = None
@@ -166,6 +173,7 @@ class StartTaskRequest(CamelModel):
     """启动整理任务请求。"""
 
     config: Optional[OrganizeConfig] = None
+    mode: str = "organize"  # "rename"（只重命名）或 "organize"（只归类移动）
 
 
 class TaskStatusResponse(CamelModel):

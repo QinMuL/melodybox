@@ -93,6 +93,7 @@ export const mockData: {
       { oldPath: "/music/双截棍.flac", newPath: "/music/周杰伦/范特西/06-双截棍.flac", action: "move", reason: "移动到对应艺术家专辑目录" },
     ],
     totalChanges: 3,
+    skipped: 0,
   },
 
   task: {

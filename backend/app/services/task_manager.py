@@ -120,7 +120,7 @@ class TaskManager:
         """推送日志消息。"""
         await self._publish(task_id, {
             "type": MSG_LOG,
-            "data": {"level": level, "message": message, "timestamp": datetime.utcnow().isoformat()},
+            "data": {"level": level, "message": message, "timestamp": datetime.now().isoformat()},
         })
 
     # ---------------- 任务执行 ----------------

@@ -22,7 +22,10 @@ _TAG_KEYS = {
 
 
 def _first_tag(tags: Any, keys: list[str]) -> Optional[str]:
-    """从 mutagen 标签对象中按候选键名取第一个非空值。"""
+    """从 mutagen 标签对象中按候选键名取值。
+
+    mutagen 对多值字段（如多艺人）返回列表，此时用 ' & ' 连接所有非空值。
+    """
     if not tags:
         return None
     # mutagen 标签键通常区分大小写，这里做大小写不敏感查找
@@ -33,11 +36,15 @@ def _first_tag(tags: Any, keys: list[str]) -> Optional[str]:
     for key in keys:
         if key in lower_map:
             val = lower_map[key]
-            # mutagen 返回的值可能是列表
+            # mutagen 返回的值可能是列表（多艺人等）
             if isinstance(val, list):
                 if not val:
                     continue
-                val = val[0]
+                # 用 ' & ' 连接所有非空值
+                parts = [str(v).strip() for v in val if v]
+                if parts:
+                    return " & ".join(parts)
+                continue
             return str(val).strip() if val is not None else None
     return None
 
@@ -160,6 +167,53 @@ def read_metadata(file_path: str) -> Dict[str, Any]:
         logger.warning("读取元数据失败 %s: %s", file_path, exc)
 
     return result
+
+
+def extract_cover(file_path: str) -> Optional[tuple[bytes, str]]:
+    """从音频文件中提取嵌入式封面图。
+
+    Returns:
+        (图片二进制数据, MIME类型) 或 None
+    """
+    try:
+        from mutagen import File as MutagenFile
+
+        audio = MutagenFile(file_path, easy=False)
+        if audio is None:
+            return None
+
+        # 通用接口：audio.pictures（FLAC/OGG/OPUS 等）
+        pictures = getattr(audio, "pictures", None)
+        if pictures:
+            for pic in pictures:
+                if pic.type == 3:  # front cover
+                    return pic.data, pic.mime
+            # 没有 front cover 就用第一张
+            pic = pictures[0]
+            return pic.data, pic.mime
+
+        # ID3 (MP3)：APIC 帧
+        tags = getattr(audio, "tags", None)
+        if tags:
+            for key in tags:
+                if str(key).upper().startswith("APIC"):
+                    frame = tags[key]
+                    if hasattr(frame, "data") and hasattr(frame, "mime"):
+                        return frame.data, frame.mime
+
+        # MP4/M4A：covr
+        if tags and "covr" in tags:
+            covr = tags["covr"]
+            if covr:
+                mime = "image/jpeg"
+                if hasattr(covr[0], "imageformat"):
+                    from mutagen.mp4 import MP4Cover
+                    if covr[0].imageformat == MP4Cover.FORMAT_PNG:
+                        mime = "image/png"
+                return bytes(covr[0]), mime
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("提取封面失败 %s: %s", file_path, exc)
+    return None
 
 
 def get_duration(file_path: str) -> float:

@@ -73,6 +73,7 @@ def render_template(template: str, data: Dict[str, Any]) -> str:
         "title": _safe_get(data, "title", "Unknown Title"),
         "year": _safe_get(data, "year", "") or "",
         "ext": _safe_get(data, "ext", "mp3").lower().lstrip("."),
+        "filename": _safe_get(data, "filename", "Unknown"),
     }
 
     # 处理音轨号：支持 {track:02d} 形式，无音轨号时用 0

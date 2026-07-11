@@ -1,348 +1,226 @@
 import { useEffect, useState } from "react";
 import {
-  Wand2,
-  Play,
+  AudioLines,
+  FolderTree,
   Eye,
   Loader2,
+  Play,
   CheckCircle2,
-  AlertCircle,
-  FolderInput,
-  FileOutput,
-  Settings2,
-  Terminal,
+  ArrowRight,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
-import type { OrganizeConfig, OrganizeTask, PreviewResult } from "@/types";
+import { formatRelativeTime } from "@/lib/format";
+import type { OrganizeTask, PreviewResult } from "@/types";
+
+type Mode = "rename" | "organize";
 
 export default function Organize() {
-  const [config, setConfig] = useState<OrganizeConfig | null>(null);
-  const [preview, setPreview] = useState<PreviewResult | null>(null);
-  const [task, setTask] = useState<OrganizeTask | null>(null);
-  const [previewing, setPreviewing] = useState(false);
-  const [starting, setStarting] = useState(false);
-
-  useEffect(() => {
-    api.organize.config().then(setConfig);
-  }, []);
-
-  const handlePreview = async () => {
-    setPreviewing(true);
-    const res = await api.organize.preview();
-    setPreview(res);
-    setPreviewing(false);
-  };
-
-  const handleStart = async () => {
-    setStarting(true);
-    const res = await api.organize.start(false);
-    // 轮询任务状态
-    const poll = async () => {
-      const t = await api.organize.task(res.taskId);
-      setTask(t);
-      if (t.status === "running" || t.status === "pending") {
-        setTimeout(poll, 2000);
-      }
-    };
-    poll();
-    setStarting(false);
-  };
-
-  const updateConfig = (key: keyof OrganizeConfig, value: unknown) => {
-    setConfig((prev) => (prev ? { ...prev, [key]: value } : prev));
-  };
-
-  if (!config) {
-    return (
-      <div className="h-64 animate-pulse rounded-xl bg-surface-card dark:bg-dark-card" />
-    );
-  }
-
-  const isRunning = task?.status === "running";
-
   return (
-    <div className="space-y-5">
-      <div className="grid gap-5 lg:grid-cols-2">
-        {/* 整理配置 */}
-        <div className="card p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Settings2 className="h-5 w-5 text-primary" />
-            <h3 className="text-base font-semibold text-ink-primary dark:text-ink-light">
-              整理配置
-            </h3>
-          </div>
-
-          <div className="space-y-4">
-            <ConfigField
-              icon={FolderInput}
-              label="输入目录"
-              value={config.inputDir}
-              onChange={(v) => updateConfig("inputDir", v)}
-            />
-            <ConfigField
-              icon={FileOutput}
-              label="输出目录"
-              value={config.outputDir}
-              onChange={(v) => updateConfig("outputDir", v)}
-            />
-
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink-secondary dark:text-ink-lightSecondary">
-                命名模板
-              </label>
-              <input
-                type="text"
-                value={config.namingTemplate}
-                onChange={(e) => updateConfig("namingTemplate", e.target.value)}
-                className="input-field font-mono"
-                placeholder="{artist}/{album}/{track:02d}-{title}"
-              />
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {["{artist}", "{album}", "{title}", "{track:02d}", "{year}"].map(
-                  (tag) => (
-                    <span
-                      key={tag}
-                      className="rounded bg-primary-50 px-2 py-0.5 font-mono text-xs text-primary dark:bg-primary-900/20 dark:text-primary-300"
-                    >
-                      {tag}
-                    </span>
-                  )
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink-secondary dark:text-ink-lightSecondary">
-                  操作模式
-                </label>
-                <select
-                  value={config.moveInsteadOfCopy ? "move" : "copy"}
-                  onChange={(e) =>
-                    updateConfig("moveInsteadOfCopy", e.target.value === "move")
-                  }
-                  className="input-field"
-                >
-                  <option value="move">移动</option>
-                  <option value="copy">复制</option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink-secondary dark:text-ink-lightSecondary">
-                  冲突策略
-                </label>
-                <select
-                  value={config.overwritePolicy}
-                  onChange={(e) =>
-                    updateConfig(
-                      "overwritePolicy",
-                      e.target.value as OrganizeConfig["overwritePolicy"]
-                    )
-                  }
-                  className="input-field"
-                >
-                  <option value="skip">跳过</option>
-                  <option value="overwrite">覆盖</option>
-                  <option value="rename">重命名</option>
-                </select>
-              </div>
-            </div>
-
-            <button
-              onClick={() => api.organize.updateConfig(config)}
-              className="btn-secondary w-full"
-            >
-              保存配置
-            </button>
-          </div>
-        </div>
-
-        {/* 操作面板 */}
-        <div className="card p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Wand2 className="h-5 w-5 text-primary" />
-            <h3 className="text-base font-semibold text-ink-primary dark:text-ink-light">
-              执行操作
-            </h3>
-          </div>
-
-          <div className="space-y-4">
-            <button
-              onClick={handlePreview}
-              disabled={previewing || isRunning}
-              className="btn-secondary w-full disabled:opacity-50"
-            >
-              {previewing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
-              预览整理结果
-            </button>
-
-            <button
-              onClick={handleStart}
-              disabled={starting || isRunning}
-              className="btn-primary w-full disabled:opacity-50"
-            >
-              {starting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : isRunning ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Play className="h-4 w-4" />
-              )}
-              {isRunning ? "整理进行中..." : "开始整理"}
-            </button>
-
-            {/* 任务进度 */}
-            {task && (
-              <div className="rounded-lg bg-surface-hover p-4 dark:bg-dark-hover">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-sm font-medium text-ink-primary dark:text-ink-light">
-                    {task.status === "completed" ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    ) : task.status === "failed" ? (
-                      <AlertCircle className="h-4 w-4 text-red-500" />
-                    ) : (
-                      <Loader2 className="h-4 w-4 animate-spin text-sky-500" />
-                    )}
-                    任务进度
-                  </span>
-                  <span className="font-mono text-sm font-bold text-primary">
-                    {task.progress}%
-                  </span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-surface-border dark:bg-dark-border">
-                  <div
-                    className="h-full rounded-full bg-primary-gradient transition-all duration-500"
-                    style={{ width: `${task.progress}%` }}
-                  />
-                </div>
-                <div className="mt-2 flex justify-between text-xs text-ink-muted dark:text-ink-lightMuted">
-                  <span>
-                    {task.processedFiles} / {task.totalFiles} 文件
-                  </span>
-                  {task.currentFile && (
-                    <span className="max-w-[50%] truncate">
-                      当前：{task.currentFile}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-ink">整理中心</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          文件命名（基于元数据重命名）和文件整理（按艺术家-专辑归类）是两个独立操作，可分别执行。
+        </p>
       </div>
 
-      {/* 预览结果 */}
-      {preview && (
-        <div className="card p-5">
-          <h3 className="mb-3 text-base font-semibold text-ink-primary dark:text-ink-light">
-            预览结果（{preview.totalChanges} 项变更）
-          </h3>
-          <div className="space-y-2">
-            {preview.changes.map((change, idx) => (
-              <div
-                key={idx}
-                className="rounded-lg border border-surface-border p-3 dark:border-dark-border"
-              >
-                <div className="mb-1 flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "rounded px-2 py-0.5 text-xs font-medium",
-                      change.action === "rename"
-                        ? "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
-                        : change.action === "move"
-                        ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"
-                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                    )}
-                  >
-                    {change.action === "rename"
-                      ? "重命名"
-                      : change.action === "move"
-                      ? "移动"
-                      : "跳过"}
-                  </span>
-                  <span className="text-xs text-ink-muted dark:text-ink-lightMuted">
-                    {change.reason}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 font-mono text-xs">
-                  <span className="text-red-500 line-through">{change.oldPath}</span>
-                  <span className="text-ink-muted">→</span>
-                  <span className="text-emerald-500">{change.newPath}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 任务日志 */}
-      {task && task.logs.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="flex items-center gap-2 border-b border-surface-border px-5 py-3 dark:border-dark-border">
-            <Terminal className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold text-ink-primary dark:text-ink-light">
-              任务日志
-            </h3>
-          </div>
-          <div className="max-h-64 overflow-y-auto bg-surface-hover p-4 font-mono text-xs dark:bg-dark-hover">
-            {task.logs.map((log, idx) => (
-              <div key={idx} className="flex gap-2 py-0.5">
-                <span className="text-ink-muted dark:text-ink-lightMuted">
-                  {log.time}
-                </span>
-                <span
-                  className={cn(
-                    "font-semibold",
-                    log.level === "error"
-                      ? "text-red-500"
-                      : log.level === "warning"
-                      ? "text-amber-500"
-                      : "text-emerald-500"
-                  )}
-                >
-                  [{log.level.toUpperCase()}]
-                </span>
-                <span className="text-ink-secondary dark:text-ink-lightSecondary">
-                  {log.message}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <OperationCard mode="rename" />
+      <OperationCard mode="organize" />
     </div>
   );
 }
 
-function ConfigField({
-  icon: Icon,
-  label,
-  value,
-  onChange,
-}: {
-  icon: typeof FolderInput;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
+/** 单个操作卡片 */
+function OperationCard({ mode }: { mode: Mode }) {
+  const isRename = mode === "rename";
+  const [preview, setPreview] = useState<PreviewResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [executing, setExecuting] = useState(false);
+  const [task, setTask] = useState<OrganizeTask | null>(null);
+
+  // 执行任务后轮询状态
+  useEffect(() => {
+    if (!task || task.status === "completed" || task.status === "failed") return;
+    const timer = setInterval(async () => {
+      const t = await api.organize.task(task.id);
+      setTask(t);
+      if (t.status === "completed" || t.status === "failed") {
+        clearInterval(timer);
+        setExecuting(false);
+      }
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [task]);
+
+  async function handlePreview() {
+    setLoading(true);
+    try {
+      const result = await api.organize.preview(mode);
+      setPreview(result);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleExecute() {
+    setExecuting(true);
+    try {
+      const { taskId } = await api.organize.start(mode);
+      const t = await api.organize.task(taskId);
+      setTask(t);
+    } catch {
+      setExecuting(false);
+    }
+  }
+
+  const icon = isRename ? <AudioLines className="h-5 w-5" /> : <FolderTree className="h-5 w-5" />;
+  const title = isRename ? "文件命名" : "文件整理";
+  const desc = isRename
+    ? "基于音乐元数据，把不规范的文件名重命名为「艺术家 - 歌曲名.扩展名」格式。不移动文件位置。"
+    : "按「艺术家/专辑/」文件夹结构归类移动文件。不修改文件名，只改变文件所在目录。";
+  const example = isRename
+    ? "答案 - 冒海飞、徐丽东 - flac.flac  →  冒海飞 - 答案.flac"
+    : "/music/冒海飞 - 答案.flac  →  /music/冒海飞/答案 (OST)/冒海飞 - 答案.flac";
+
   return (
-    <div>
-      <label className="mb-1.5 block text-sm font-medium text-ink-secondary dark:text-ink-lightSecondary">
-        {label}
-      </label>
-      <div className="relative">
-        <Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted dark:text-ink-lightMuted" />
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="input-field pl-10 font-mono"
-        />
+    <div className="card p-6">
+      {/* 标题区 */}
+      <div className="flex items-start gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          {icon}
+        </div>
+        <div className="flex-1">
+          <h2 className="text-lg font-semibold text-ink">{title}</h2>
+          <p className="mt-1 text-sm text-gray-500">{desc}</p>
+          <div className="mt-2 rounded-lg bg-gray-50 px-3 py-2 font-mono text-xs text-gray-600">
+            {example}
+          </div>
+        </div>
       </div>
+
+      {/* 操作按钮 */}
+      <div className="mt-5 flex gap-3">
+        <button
+          onClick={handlePreview}
+          disabled={loading || executing}
+          className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+          预览结果
+        </button>
+        <button
+          onClick={handleExecute}
+          disabled={executing || loading}
+          className="btn-primary flex items-center gap-2 disabled:opacity-50"
+        >
+          {executing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+          {executing ? "执行中..." : `执行${title}`}
+        </button>
+      </div>
+
+      {/* 预览结果 */}
+      {preview && (
+        <div className="mt-5">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-ink">
+              预览结果（共 {preview.totalChanges} 项
+              {preview.skipped > 0 && `，${preview.skipped} 项跳过`}）
+            </h3>
+          </div>
+          <div className="max-h-80 space-y-2 overflow-y-auto">
+            {preview.changes.map((c, i) => (
+              <div
+                key={i}
+                className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`rounded px-1.5 py-0.5 font-medium ${
+                      c.action === "skip"
+                        ? "bg-gray-200 text-gray-600"
+                        : c.action === "move"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-green-100 text-green-700"
+                    }`}
+                  >
+                    {c.action === "skip" ? "跳过" : c.action === "move" ? "移动" : "复制"}
+                  </span>
+                  {c.reason && <span className="text-gray-400">{c.reason}</span>}
+                </div>
+                <div className="mt-1.5 font-mono text-gray-600">
+                  <div className="truncate">{c.oldPath}</div>
+                  <div className="flex items-center gap-1 text-primary">
+                    <ArrowRight className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{c.newPath}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 执行进度 */}
+      {task && (
+        <div className="mt-5 rounded-lg border border-primary/20 bg-primary/5 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {task.status === "completed" ? (
+                <CheckCircle2 className="h-5 w-5 text-primary" />
+              ) : (
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              )}
+              <span className="text-sm font-semibold text-ink">
+                {task.status === "completed" ? "已完成" : task.status === "failed" ? "失败" : "执行中"}
+              </span>
+            </div>
+            <span className="text-sm text-gray-500">
+              {task.processedFiles} / {task.totalFiles}（{task.progress.toFixed(0)}%）
+            </span>
+          </div>
+          {/* 进度条 */}
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-200">
+            <div
+              className="h-full bg-primary transition-all duration-500"
+              style={{ width: `${task.progress}%` }}
+            />
+          </div>
+          {/* 当前文件 */}
+          {task.currentFile && (
+            <div className="mt-2 truncate font-mono text-xs text-gray-500">
+              {task.currentFile}
+            </div>
+          )}
+          {/* 结果摘要 */}
+          {task.status === "completed" && task.result && (
+            <div className="mt-3 flex gap-4 text-xs">
+              {Object.entries(task.result).map(([k, v]) => (
+                <span key={k} className="text-gray-500">
+                  {k}: <span className="font-semibold text-ink">{String(v)}</span>
+                </span>
+              ))}
+            </div>
+          )}
+          {/* 日志 */}
+          {task.logs && task.logs.length > 0 && (
+            <div className="mt-3 max-h-40 space-y-1 overflow-y-auto rounded bg-black/80 p-3 font-mono text-xs text-green-400">
+              {task.logs.map((l, i) => (
+                <div key={i}>
+                  <span className="text-gray-400">[{l.time}]</span>{" "}
+                  <span className={l.level === "error" ? "text-red-400" : l.level === "warning" ? "text-yellow-400" : "text-green-400"}>
+                    {l.message}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {task.startedAt && (
+            <div className="mt-2 text-xs text-gray-400">
+              开始于 {formatRelativeTime(task.startedAt)}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

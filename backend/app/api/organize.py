@@ -42,11 +42,17 @@ def update_organize_config(config: OrganizeConfig) -> OrganizeConfig:
 
 @router.post("/preview", response_model=PreviewResponse)
 def preview(req: PreviewRequest, db: Session = Depends(get_db)) -> PreviewResponse:
-    """预览整理结果（dryRun，不实际操作文件）。"""
+    """预览整理结果（dryRun，不实际操作文件）。
+
+    mode:
+        - "rename": 只重命名文件（基于元数据），不移动位置
+        - "organize": 只按 艺术家/专辑/ 结构归类移动，不改文件名
+    """
     saved = load_organize_config()
     input_dir = req.input_dir or saved.get("inputDir") or saved.get("input_dir") or "/music"
     output_dir = req.output_dir or saved.get("outputDir") or saved.get("output_dir") or "/music"
-    template = req.naming_template or saved.get("namingTemplate") or saved.get("naming_template") or "{artist}/{album}/{track:02d}-{title}.{ext}"
+    mode = req.mode or "organize"
+    template = req.naming_template  # 为 None 时后端使用模式默认模板
     move = req.move_instead_of_copy if req.move_instead_of_copy is not None else saved.get("moveInsteadOfCopy", saved.get("move_instead_of_copy", False))
     policy = req.overwrite_policy or saved.get("overwritePolicy") or saved.get("overwrite_policy") or "skip"
     exclude_patterns = req.exclude_patterns if req.exclude_patterns is not None else (saved.get("excludePatterns") or saved.get("exclude_patterns") or [])
@@ -54,6 +60,7 @@ def preview(req: PreviewRequest, db: Session = Depends(get_db)) -> PreviewRespon
     items: list[PreviewItem] = organize_service.preview(
         input_dir=input_dir,
         output_dir=output_dir,
+        mode=mode,
         naming_template=template,
         move=move,
         policy=policy,
@@ -65,12 +72,22 @@ def preview(req: PreviewRequest, db: Session = Depends(get_db)) -> PreviewRespon
 
 @router.post("/start", response_model=StartTaskResponse)
 def start_task(req: StartTaskRequest, db: Session = Depends(get_db)) -> StartTaskResponse:
-    """启动整理任务，返回 taskId。"""
+    """启动整理任务，返回 taskId。
+
+    mode:
+        - "rename": 只重命名文件（基于元数据），不移动位置
+        - "organize": 只按 艺术家/专辑/ 结构归类移动，不改文件名
+    """
     # 确定配置：优先使用请求中的配置，否则用已保存配置
     if req.config is not None:
         config = req.config.model_dump()
     else:
         config = load_organize_config()
+
+    # 注入 mode，并清除旧模板（让后端根据 mode 使用对应的默认模板）
+    config["mode"] = req.mode or "organize"
+    config.pop("namingTemplate", None)
+    config.pop("naming_template", None)
 
     # 创建任务记录
     task = OrganizeTask(

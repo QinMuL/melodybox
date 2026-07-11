@@ -6,6 +6,31 @@ import { formatDuration, formatSize, formatBitrate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Album, Artist, Song } from "@/types";
 
+/** 带回退的图片组件：加载失败时显示 children */
+function ImageWithFallback({
+  src,
+  alt,
+  className,
+  children,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <>{children}</>;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className={className}
+    />
+  );
+}
+
 type View = "artists" | "albums" | "songs";
 
 export default function Library() {
@@ -189,8 +214,16 @@ function ArtistGrid({
           className="card group p-4 text-center hover:-translate-y-1 hover:shadow-cardHover"
           style={{ animationDelay: `${idx * 40}ms` }}
         >
-          <div className="mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-full bg-primary-gradient text-2xl font-bold text-white shadow-primary transition-transform group-hover:scale-105">
-            {artist.name.charAt(0)}
+          <div className="mx-auto mb-3 h-20 w-20 overflow-hidden rounded-full bg-primary-gradient shadow-primary transition-transform group-hover:scale-105">
+            <ImageWithFallback
+              src={`/api/library/artists/${artist.id}/avatar`}
+              alt={artist.name}
+              className="h-full w-full object-cover"
+            >
+              <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-white">
+                {artist.name.charAt(0)}
+              </div>
+            </ImageWithFallback>
           </div>
           <h4 className="truncate text-sm font-medium text-ink-primary dark:text-ink-light">
             {artist.name}
@@ -232,9 +265,15 @@ function AlbumGrid({
           style={{ animationDelay: `${idx * 40}ms` }}
         >
           <div className="relative aspect-square overflow-hidden rounded-t-xl bg-gradient-to-br from-primary-400 to-primary-700">
-            <div className="flex h-full items-center justify-center text-4xl font-bold text-white/30">
-              <Disc3 className="h-12 w-12" />
-            </div>
+            <ImageWithFallback
+              src={`/api/library/albums/${album.id}/cover`}
+              alt={album.title}
+              className="h-full w-full object-cover"
+            >
+              <div className="flex h-full items-center justify-center text-4xl font-bold text-white/30">
+                <Disc3 className="h-12 w-12" />
+              </div>
+            </ImageWithFallback>
             <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/20" />
           </div>
           <div className="p-3">

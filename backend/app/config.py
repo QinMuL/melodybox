@@ -43,7 +43,7 @@ DEFAULT_ORGANIZE_CONFIG: Dict[str, Any] = {
     "outputDir": os.environ.get("MUSIC_OUTPUT_DIR", "/music"),
     "recycleDir": os.environ.get("MUSIC_RECYCLE_DIR", "/music/.recycle"),
     "namingTemplate": "{artist}/{album}/{track:02d}-{title}.{ext}",
-    "moveInsteadOfCopy": False,
+    "moveInsteadOfCopy": True,
     "overwritePolicy": "skip",  # skip | overwrite | rename
     "excludePatterns": [],  # 排除模式列表
 }
