@@ -2,8 +2,8 @@ version: "3.8"
 
 services:
   melodybox:
-    build: .
-    image: melodybox:latest
+    build: .  # 本地构建备选：docker compose build
+    image: ghcr.io/qinmul/melodybox:latest  # NAS 设备直接拉取：docker compose pull
     container_name: melodybox
     restart: unless-stopped
     ports:
