@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  melodybox:
+    build: .
+    image: melodybox:latest
+    container_name: melodybox
+    restart: unless-stopped
+    ports:
+      - "28080:28080"
+    volumes:
+      # 音乐目录映射（请修改左侧为实际 NAS 音乐目录路径）
+      - /path/to/your/music:/music:rw
+      # 数据持久化（SQLite 数据库）
+      - ./data:/app/data:rw
+    environment:
+      - TZ=Asia/Shanghai
+      - MUSIC_INPUT_DIR=/music
+      - MUSIC_OUTPUT_DIR=/music
+      - MUSIC_RECYCLE_DIR=/music/.recycle
+      - DB_PATH=/app/data/melodybox.db
+      - CONFIG_FILE=/app/data/config.json
+      - LOG_LEVEL=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:28080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: "PingFang SC", "HarmonyOS Sans", "Microsoft YaHei",
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* 自定义滚动条 - 仿 QQ 音乐风格 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(153, 153, 153, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(153, 153, 153, 0.5);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+@layer components {
+  /* 主按钮 - 绿色渐变胶囊 */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-pill bg-primary-gradient px-5 py-2.5 text-sm font-medium text-white shadow-primary transition-all duration-200 hover:bg-primary-gradient-hover hover:shadow-glow active:scale-95;
+  }
+
+  /* 次要按钮 */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-pill border border-surface-border bg-surface-card px-5 py-2.5 text-sm font-medium text-ink-secondary transition-all duration-200 hover:border-primary hover:text-primary active:scale-95 dark:border-dark-border dark:bg-dark-card dark:text-ink-lightSecondary dark:hover:border-primary dark:hover:text-primary;
+  }
+
+  /* 卡片容器 */
+  .card {
+    @apply rounded-xl bg-surface-card shadow-card transition-all duration-200 dark:bg-dark-card;
+  }
+
+  /* 输入框 */
+  .input-field {
+    @apply w-full rounded-lg border border-surface-border bg-surface-light px-3 py-2 text-sm text-ink-primary outline-none transition-all duration-200 placeholder:text-ink-muted focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-dark-border dark:bg-dark-hover dark:text-ink-light dark:placeholder:text-ink-lightMuted;
+  }
+}
