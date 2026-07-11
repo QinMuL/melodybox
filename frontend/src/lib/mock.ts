@@ -138,9 +138,12 @@ export const mockData = {
   ] as DuplicateGroup[],
 
   settings: {
-    musicDirs: { input: "/music", output: "/music", recycle: "/music/.recycle" },
+    inputDir: "/music",
+    outputDir: "/music",
+    recycleDir: "/music/.recycle",
+    dbPath: "/app/data/melodybox.db",
+    logLevel: "info" as const,
     supportedFormats: ["MP3", "FLAC", "APE", "WAV", "M4A", "OGG", "OPUS"],
     concurrency: 4,
-    logLevel: "info" as const,
   } as SystemSettings,
 };

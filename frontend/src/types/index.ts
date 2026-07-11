@@ -107,10 +107,13 @@ export interface DuplicateGroup {
 }
 
 export interface SystemSettings {
-  musicDirs: { input: string; output: string; recycle: string };
+  inputDir: string;
+  outputDir: string;
+  recycleDir: string;
+  dbPath: string;
+  logLevel: "debug" | "info" | "warning" | "error";
   supportedFormats: string[];
   concurrency: number;
-  logLevel: "debug" | "info" | "warning" | "error";
 }
 
 export interface Paginated<T> {

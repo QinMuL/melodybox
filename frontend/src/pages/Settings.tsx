@@ -68,30 +68,24 @@ export default function Settings() {
         <div className="space-y-4">
           <DirField
             label="输入目录（原始音乐文件）"
-            value={settings.musicDirs.input}
-            onChange={(v) =>
-              update("musicDirs", { ...settings.musicDirs, input: v })
-            }
+            value={settings.inputDir}
+            onChange={(v) => update("inputDir", v)}
             testResult={testResult}
             testing={testing}
             onTest={handleTestDir}
           />
           <DirField
             label="输出目录（整理后文件）"
-            value={settings.musicDirs.output}
-            onChange={(v) =>
-              update("musicDirs", { ...settings.musicDirs, output: v })
-            }
+            value={settings.outputDir}
+            onChange={(v) => update("outputDir", v)}
             testResult={testResult}
             testing={testing}
             onTest={handleTestDir}
           />
           <DirField
             label="回收站目录（重复/废弃文件）"
-            value={settings.musicDirs.recycle}
-            onChange={(v) =>
-              update("musicDirs", { ...settings.musicDirs, recycle: v })
-            }
+            value={settings.recycleDir}
+            onChange={(v) => update("recycleDir", v)}
             testResult={testResult}
             testing={testing}
             onTest={handleTestDir}

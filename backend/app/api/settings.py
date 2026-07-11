@@ -12,6 +12,9 @@ from app.utils.file_utils import is_dir_accessible, is_dir_writable
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
+# 支持的音频格式（与 file_utils.SUPPORTED_FORMATS 一致）
+SUPPORTED_FORMATS = [".mp3", ".flac", ".wav", ".m4a", ".ogg", ".aac", ".wma", ".ape"]
+
 
 @router.get("/", response_model=SystemSettings)
 def get_settings() -> SystemSettings:
@@ -22,6 +25,8 @@ def get_settings() -> SystemSettings:
         recycleDir=settings.MUSIC_RECYCLE_DIR,
         dbPath=settings.DB_PATH,
         logLevel=settings.LOG_LEVEL,
+        supportedFormats=SUPPORTED_FORMATS,
+        concurrency=4,
     )
 
 

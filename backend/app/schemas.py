@@ -245,6 +245,8 @@ class SystemSettings(BaseModel):
     recycleDir: str
     dbPath: str
     logLevel: str
+    supportedFormats: List[str] = Field(default_factory=list)
+    concurrency: int = 4
 
 
 class TestDirRequest(BaseModel):
