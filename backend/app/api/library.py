@@ -138,6 +138,40 @@ def list_album_songs(
     )
 
 
+@router.get("/albums", response_model=AlbumListResponse)
+def list_albums(
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+) -> AlbumListResponse:
+    """获取所有专辑分页列表。"""
+    query = db.query(Album).order_by(Album.title_normalized.asc())
+    total = query.count()
+    albums = query.offset((page - 1) * pageSize).limit(pageSize).all()
+    from app.schemas import AlbumItem
+    return AlbumListResponse(
+        items=[AlbumItem.model_validate(a) for a in albums],
+        total=total,
+    )
+
+
+@router.get("/songs", response_model=SongListResponse)
+def list_songs(
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(100, ge=1, le=1000),
+    db: Session = Depends(get_db),
+) -> SongListResponse:
+    """获取所有歌曲分页列表。"""
+    query = db.query(Song).order_by(Song.title.asc())
+    total = query.count()
+    songs = query.offset((page - 1) * pageSize).limit(pageSize).all()
+    from app.schemas import SongItem
+    return SongListResponse(
+        items=[SongItem.model_validate(s) for s in songs],
+        total=total,
+    )
+
+
 @router.get("/search", response_model=SearchResponse)
 def search(
     q: str = Query(..., min_length=1, description="搜索关键词"),

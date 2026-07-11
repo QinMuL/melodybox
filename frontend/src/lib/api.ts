@@ -64,6 +64,22 @@ export const api = {
             .then((r) => r.data),
         { items: mockData.songs.filter((s) => s.albumId === albumId) }
       ),
+    allSongs: (page = 1, pageSize = 100) =>
+      withFallback(
+        () =>
+          client
+            .get<Paginated<Song>>("/library/songs", { params: { page, pageSize } })
+            .then((r) => r.data),
+        { items: mockData.songs, total: mockData.songs.length }
+      ),
+    allAlbums: (page = 1, pageSize = 50) =>
+      withFallback(
+        () =>
+          client
+            .get<Paginated<Album>>("/library/albums", { params: { page, pageSize } })
+            .then((r) => r.data),
+        { items: mockData.albums, total: mockData.albums.length }
+      ),
     search: (q: string) =>
       withFallback(
         () =>

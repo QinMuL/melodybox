@@ -20,12 +20,36 @@ export default function Library() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 加载艺术家列表
   useEffect(() => {
+    setLoading(true);
     api.library.artists(1, 100).then((res) => {
       setArtists(res.items);
       setLoading(false);
     });
   }, []);
+
+  // 切换到专辑视图时加载全部专辑
+  useEffect(() => {
+    if (view === "albums" && !selectedArtist) {
+      setLoading(true);
+      api.library.allAlbums(1, 100).then((res) => {
+        setAlbums(res.items);
+        setLoading(false);
+      });
+    }
+  }, [view, selectedArtist]);
+
+  // 切换到歌曲视图时加载全部歌曲
+  useEffect(() => {
+    if (view === "songs" && !selectedAlbum) {
+      setLoading(true);
+      api.library.allSongs(1, 200).then((res) => {
+        setSongs(res.items);
+        setLoading(false);
+      });
+    }
+  }, [view, selectedAlbum]);
 
   const handleArtistClick = async (artist: Artist) => {
     setSelectedArtist(artist);
@@ -45,11 +69,19 @@ export default function Library() {
     setLoading(false);
   };
 
+  const handleTabChange = (tab: View) => {
+    setView(tab);
+    setSelectedArtist(null);
+    setSelectedAlbum(null);
+  };
+
   const handleBack = () => {
-    if (view === "songs") {
+    if (view === "songs" && selectedAlbum) {
+      // 从专辑歌曲返回到专辑列表
       setView("albums");
       setSelectedAlbum(null);
-    } else if (view === "albums") {
+    } else if (view === "albums" && selectedArtist) {
+      // 从艺术家专辑返回到艺术家列表
       setView("artists");
       setSelectedArtist(null);
     }
@@ -61,48 +93,52 @@ export default function Library() {
 
   return (
     <div className="space-y-5">
-      {/* 面包屑 */}
-      <div className="flex items-center gap-2 text-sm">
-        <button
-          onClick={() => {
-            setView("artists");
-            setSelectedArtist(null);
-            setSelectedAlbum(null);
-          }}
-          className={cn(
-            "transition-colors",
-            view === "artists"
-              ? "font-semibold text-primary"
-              : "text-ink-muted hover:text-primary dark:text-ink-lightMuted"
-          )}
-        >
-          艺术家
-        </button>
-        {selectedArtist && (
-          <>
-            <ChevronRight className="h-4 w-4 text-ink-muted" />
-            <button
-              onClick={handleBack}
-              className={cn(
-                "transition-colors",
-                view === "albums"
-                  ? "font-semibold text-primary"
-                  : "text-ink-muted hover:text-primary dark:text-ink-lightMuted"
-              )}
-            >
-              {selectedArtist.name}
-            </button>
-          </>
-        )}
-        {selectedAlbum && (
-          <>
-            <ChevronRight className="h-4 w-4 text-ink-muted" />
-            <span className="font-semibold text-primary">
-              {selectedAlbum.title}
-            </span>
-          </>
-        )}
+      {/* 视图切换标签 */}
+      <div className="flex items-center gap-1 border-b border-surface-border dark:border-dark-border">
+        {(["artists", "albums", "songs"] as View[]).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => handleTabChange(tab)}
+            className={cn(
+              "relative px-4 py-2.5 text-sm font-medium transition-colors",
+              view === tab
+                ? "text-primary"
+                : "text-ink-muted hover:text-ink-primary dark:text-ink-lightMuted dark:hover:text-ink-light"
+            )}
+          >
+            {tab === "artists" ? "艺术家" : tab === "albums" ? "专辑" : "歌曲"}
+            {view === tab && (
+              <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-primary" />
+            )}
+          </button>
+        ))}
       </div>
+
+      {/* 面包屑（层级浏览时显示） */}
+      {(selectedArtist || selectedAlbum) && (
+        <div className="flex items-center gap-2 text-sm">
+          <button
+            onClick={handleBack}
+            className="text-ink-muted transition-colors hover:text-primary dark:text-ink-lightMuted"
+          >
+            ← 返回
+          </button>
+          <ChevronRight className="h-4 w-4 text-ink-muted" />
+          {selectedArtist && (
+            <span className="font-semibold text-primary">
+              {selectedArtist.name}
+            </span>
+          )}
+          {selectedAlbum && (
+            <>
+              <ChevronRight className="h-4 w-4 text-ink-muted" />
+              <span className="font-semibold text-primary">
+                {selectedAlbum.title}
+              </span>
+            </>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
@@ -220,7 +256,7 @@ function SongList({ songs, albumTitle }: { songs: Song[]; albumTitle?: string })
     return (
       <div className="py-20 text-center text-ink-muted dark:text-ink-lightMuted">
         <Music2 className="mx-auto mb-3 h-12 w-12 opacity-30" />
-        <p>{albumTitle} 暂无歌曲数据</p>
+        <p>{albumTitle ? `${albumTitle} 暂无歌曲数据` : "暂无歌曲数据"}</p>
       </div>
     );
   }
@@ -239,13 +275,15 @@ function SongList({ songs, albumTitle }: { songs: Song[]; albumTitle?: string })
           </tr>
         </thead>
         <tbody>
-          {songs.map((song) => (
+          {songs.map((song, idx) => (
             <tr
               key={song.id}
               className="group border-b border-surface-border transition-colors hover:bg-surface-hover dark:border-dark-border/50 dark:hover:bg-dark-hover"
             >
               <td className="px-4 py-3 font-mono text-sm text-ink-muted dark:text-ink-lightMuted">
-                {String(song.trackNumber).padStart(2, "0")}
+                {song.trackNumber != null
+                  ? String(song.trackNumber).padStart(2, "0")
+                  : idx + 1}
               </td>
               <td className="px-4 py-3">
                 <span className="text-sm font-medium text-ink-primary dark:text-ink-light">
@@ -253,18 +291,20 @@ function SongList({ songs, albumTitle }: { songs: Song[]; albumTitle?: string })
                 </span>
               </td>
               <td className="hidden px-4 py-3 md:table-cell">
-                <span className="rounded bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary dark:bg-primary-900/20 dark:text-primary-300">
-                  {song.format}
-                </span>
+                {song.format && (
+                  <span className="rounded bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary dark:bg-primary-900/20 dark:text-primary-300">
+                    {song.format}
+                  </span>
+                )}
               </td>
               <td className="hidden px-4 py-3 font-mono text-xs text-ink-secondary dark:text-ink-lightSecondary lg:table-cell">
-                {formatBitrate(song.bitrate)}
+                {song.bitrate ? formatBitrate(song.bitrate) : "-"}
               </td>
               <td className="hidden px-4 py-3 font-mono text-xs text-ink-secondary dark:text-ink-lightSecondary lg:table-cell">
-                {formatSize(song.fileSize)}
+                {song.fileSize ? formatSize(song.fileSize) : "-"}
               </td>
               <td className="px-4 py-3 text-right font-mono text-sm text-ink-secondary dark:text-ink-lightSecondary">
-                {formatDuration(song.duration)}
+                {song.duration ? formatDuration(song.duration) : "-"}
               </td>
             </tr>
           ))}
