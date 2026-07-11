@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from datetime import datetime
@@ -176,3 +177,100 @@ def scan_directory(
     _recompute_counts(db)
     db.commit()
     return indexed, total
+
+
+async def run_scan_task(
+    task_id: str,
+    directory: str,
+    exclude_patterns: List[str] | None,
+    db_session_factory,
+) -> Dict[str, Any]:
+    """执行扫描入库的异步任务。
+
+    Args:
+        task_id: 任务 ID
+        directory: 扫描目录
+        exclude_patterns: 排除模式
+        db_session_factory: 返回新数据库会话的可调用对象
+
+    Returns:
+        任务结果字典
+    """
+    from app.services.task_manager import task_manager
+    from app.models import OrganizeTask, TaskLog
+
+    db = db_session_factory()
+    try:
+        # 更新任务记录为 running
+        task = db.query(OrganizeTask).filter(OrganizeTask.id == task_id).first()
+        if task is not None:
+            task.status = "running"
+            task.task_type = "scan"
+            task.started_at = datetime.utcnow()
+            db.commit()
+
+        await task_manager.send_log(task_id, "info", f"开始扫描目录: {directory}")
+
+        # 进度回调（同步 → 推送到 WebSocket）
+        loop = asyncio.get_event_loop()
+
+        def _on_progress(processed: int, total: int, current_file: str) -> None:
+            progress = (processed / total * 100) if total else 100.0
+            # 推送到 WebSocket（线程安全：通过 run_coroutine_threadsafe）
+            import asyncio as _asyncio
+            fut = _asyncio.run_coroutine_threadsafe(
+                task_manager.update_progress(
+                    task_id,
+                    progress=progress,
+                    total_files=total,
+                    processed_files=processed,
+                    current_file=current_file,
+                ),
+                loop,
+            )
+            try:
+                fut.result(timeout=1)
+            except Exception:
+                pass
+            # 同步更新数据库
+            if task is not None:
+                task.processed_files = processed
+                task.total_files = total
+                task.progress = progress
+                task.current_file = current_file
+                db.commit()
+
+        # 在线程池中执行同步扫描
+        indexed, total = await loop.run_in_executor(
+            None,
+            lambda: scan_directory(db, directory, exclude_patterns, on_progress=_on_progress),
+        )
+
+        result = {"indexed": indexed, "total": total, "directory": directory}
+        if task is not None:
+            task.status = "completed"
+            task.progress = 100.0
+            task.processed_files = total
+            task.total_files = total
+            task.current_file = None
+            task.completed_at = datetime.utcnow()
+            task.result = result
+            db.commit()
+        await task_manager.send_log(
+            task_id, "info",
+            f"扫描完成：共 {total} 个文件，成功入库 {indexed} 个",
+        )
+        return result
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("扫描任务异常: %s", task_id)
+        task = db.query(OrganizeTask).filter(OrganizeTask.id == task_id).first()
+        if task is not None:
+            task.status = "failed"
+            task.completed_at = datetime.utcnow()
+            task.result = {"error": str(exc)}
+            db.commit()
+        db.add(TaskLog(task_id=task_id, level="error", message=f"扫描异常: {exc}"))
+        db.commit()
+        raise
+    finally:
+        db.close()

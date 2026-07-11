@@ -75,6 +75,22 @@ export const api = {
             .then((r) => r.data),
         { songs: [], artists: [], albums: [] }
       ),
+    scan: (directory?: string) =>
+      withFallback(
+        () =>
+          client
+            .post<{ taskId: string; status: string }>("/library/scan", {
+              directory,
+              computeHash: false,
+            })
+            .then((r) => r.data),
+        { taskId: "mock-scan-001", status: "pending" }
+      ),
+    scanStatus: () =>
+      withFallback(
+        () => client.get("/library/scan/status").then((r) => r.data),
+        null
+      ),
   },
 
   // 整理

@@ -7,9 +7,9 @@ from pathlib import Path
 from fastapi import APIRouter
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.config import CONFIG_FILE, load_organize_config, save_organize_config, settings
 from app.schemas import MessageResponse, SystemSettings, TestDirRequest, TestDirResponse
-from app.utils.file_utils import is_dir_accessible, is_dir_writable
+from app.utils.file_utils import ensure_dir, is_dir_accessible, is_dir_writable
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -36,11 +36,16 @@ def _count_audio_files(directory: str, limit: int = 10000) -> int:
 
 @router.get("/", response_model=SystemSettings)
 def get_settings() -> SystemSettings:
-    """获取系统配置。"""
+    """获取系统配置。
+
+    优先从持久化的 config.json 读取用户修改的目录路径，
+    未修改的字段回退到环境变量默认值。
+    """
+    saved = load_organize_config()
     return SystemSettings(
-        inputDir=settings.MUSIC_INPUT_DIR,
-        outputDir=settings.MUSIC_OUTPUT_DIR,
-        recycleDir=settings.MUSIC_RECYCLE_DIR,
+        inputDir=saved.get("inputDir") or settings.MUSIC_INPUT_DIR,
+        outputDir=saved.get("outputDir") or settings.MUSIC_OUTPUT_DIR,
+        recycleDir=saved.get("recycleDir") or settings.MUSIC_RECYCLE_DIR,
         dbPath=settings.DB_PATH,
         logLevel=settings.LOG_LEVEL,
         supportedFormats=SUPPORTED_FORMATS,
@@ -52,10 +57,31 @@ def get_settings() -> SystemSettings:
 def update_settings(cfg: SystemSettings) -> SystemSettings:
     """更新系统配置。
 
-    注意：环境变量在运行时不可变，此接口仅返回当前生效配置。
-    如需持久化运行时配置，请使用整理配置接口 /api/organize/config。
+    将目录配置持久化到 config.json，重启容器后仍生效。
+    注意：环境变量级别的配置（如 LOG_LEVEL、DB_PATH）运行时不可变。
     """
-    return cfg
+    saved = load_organize_config()
+    # 合并用户修改的目录字段到整理配置中
+    saved["inputDir"] = cfg.inputDir
+    saved["outputDir"] = cfg.outputDir
+    saved["recycleDir"] = cfg.recycleDir
+    save_organize_config(saved)
+
+    # 自动创建回收站目录（如果用户指定了新路径）
+    try:
+        ensure_dir(cfg.recycleDir)
+    except OSError:
+        pass  # 创建失败不阻塞保存
+
+    return SystemSettings(
+        inputDir=cfg.inputDir,
+        outputDir=cfg.outputDir,
+        recycleDir=cfg.recycleDir,
+        dbPath=settings.DB_PATH,
+        logLevel=settings.LOG_LEVEL,
+        supportedFormats=SUPPORTED_FORMATS,
+        concurrency=cfg.concurrency,
+    )
 
 
 @router.post("/test-dir", response_model=TestDirResponse)

@@ -1,14 +1,16 @@
 """音乐库查询路由 /api/library。"""
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.models import Album, Artist, DuplicateGroup, Song
+from app.config import load_organize_config
+from app.database import SessionLocal, get_db
+from app.models import Album, Artist, DuplicateGroup, OrganizeTask, Song
 from app.schemas import (
     AlbumListResponse,
     ArtistItem,
@@ -16,10 +18,21 @@ from app.schemas import (
     SearchResponse,
     SearchResultItem,
     SongListResponse,
+    StartTaskResponse,
     StatsResponse,
+    TaskStatusResponse,
 )
+from app.services.scan_service import run_scan_task
+from app.services.task_manager import task_manager
 
 router = APIRouter(prefix="/library", tags=["library"])
+
+
+class ScanRequest(BaseModel):
+    """扫描入库请求。"""
+    directory: Optional[str] = None
+    excludePatterns: Optional[List[str]] = None
+    computeHash: bool = False
 
 
 @router.get("/stats", response_model=StatsResponse)
@@ -191,3 +204,59 @@ def search(
             ))
 
     return SearchResponse(items=items, total=len(items))
+
+
+@router.post("/scan", response_model=StartTaskResponse)
+def scan_library(
+    req: ScanRequest,
+    db: Session = Depends(get_db),
+) -> StartTaskResponse:
+    """启动扫描入库任务。
+
+    扫描指定目录下所有音频文件，读取元数据并写入数据库。
+    不指定 directory 时使用已保存的整理配置中的 inputDir。
+    """
+    # 确定扫描目录
+    saved = load_organize_config()
+    directory = req.directory or saved.get("inputDir") or "/music"
+    exclude_patterns = req.excludePatterns if req.excludePatterns is not None else saved.get("excludePatterns", [])
+
+    # 创建任务记录
+    task = OrganizeTask(
+        task_type="scan",
+        status="pending",
+        progress=0.0,
+        total_files=0,
+        processed_files=0,
+        config={
+            "directory": directory,
+            "excludePatterns": exclude_patterns,
+            "computeHash": req.computeHash,
+        },
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+
+    # 启动后台扫描任务
+    task_manager.start_task(
+        task.id,
+        run_scan_task(task.id, directory, exclude_patterns, SessionLocal),
+    )
+    return StartTaskResponse(taskId=task.id, status=task.status)
+
+
+@router.get("/scan/status", response_model=TaskStatusResponse)
+def get_scan_status(
+    db: Session = Depends(get_db),
+) -> TaskStatusResponse:
+    """查询最新扫描任务状态。"""
+    task = (
+        db.query(OrganizeTask)
+        .filter(OrganizeTask.task_type == "scan")
+        .order_by(OrganizeTask.created_at.desc())
+        .first()
+    )
+    if task is None:
+        raise HTTPException(status_code=404, detail="尚无扫描任务")
+    return TaskStatusResponse.model_validate(task)

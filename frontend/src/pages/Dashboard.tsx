@@ -11,6 +11,7 @@ import {
   Loader2,
   Clock,
   HardDrive,
+  ScanLine,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatNumber, formatSize, formatRelativeTime } from "@/lib/format";
@@ -30,6 +31,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState<LibraryStats | null>(null);
   const [tasks, setTasks] = useState<OrganizeTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const [scanMsg, setScanMsg] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -45,6 +48,22 @@ export default function Dashboard() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleScan = async () => {
+    setScanning(true);
+    setScanMsg({ type: "info", text: "扫描任务已提交..." });
+    try {
+      const res = await api.library.scan();
+      setScanMsg({ type: "success", text: `扫描已启动（任务ID: ${res.taskId.slice(0, 8)}），请稍后刷新查看结果` });
+      // 30 秒后自动刷新统计
+      setTimeout(loadData, 30000);
+    } catch (err) {
+      setScanMsg({ type: "error", text: `扫描失败: ${err instanceof Error ? err.message : String(err)}` });
+    } finally {
+      setScanning(false);
+      setTimeout(() => setScanMsg(null), 8000);
+    }
+  };
 
   const statItems: StatItem[] = stats
     ? [
@@ -118,10 +137,22 @@ export default function Dashboard() {
         <h3 className="mb-4 text-base font-semibold text-ink-primary dark:text-ink-light">
           快速操作
         </h3>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleScan}
+            disabled={scanning}
+            className="btn-primary"
+          >
+            {scanning ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ScanLine className="h-4 w-4" />
+            )}
+            扫描入库
+          </button>
           <button
             onClick={() => navigate("/organize")}
-            className="btn-primary"
+            className="btn-secondary"
           >
             <Wand2 className="h-4 w-4" />
             一键整理
@@ -137,7 +168,24 @@ export default function Dashboard() {
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
             刷新音乐库
           </button>
+          {scanMsg && (
+            <span
+              className={cn(
+                "text-sm font-medium",
+                scanMsg.type === "success"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : scanMsg.type === "error"
+                  ? "text-red-500"
+                  : "text-sky-600 dark:text-sky-400"
+              )}
+            >
+              {scanMsg.text}
+            </span>
+          )}
         </div>
+        <p className="mt-3 text-xs text-ink-muted dark:text-ink-lightMuted">
+          点击「扫描入库」会扫描输入目录下所有音频文件并入库到数据库，扫描完成后音乐库将显示艺术家和专辑列表
+        </p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
