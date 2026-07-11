@@ -3,7 +3,7 @@ version: "3.8"
 services:
   melodybox:
     build: .  # 本地构建备选：docker compose build
-    image: ghcr.io/qinmul/melodybox:0.1.4  # 拉取指定版本：docker compose pull（版本号对应 GitHub Actions 构建号）
+    image: ghcr.io/qinmul/melodybox:latest  # 部署拉取最新版；回滚可改为具体版本号如 0.1.3
     container_name: melodybox
     restart: unless-stopped
     ports:
