@@ -257,3 +257,4 @@ class TestDirResponse(BaseModel):
     accessible: bool
     writable: bool
     message: str
+    fileCount: int = 0

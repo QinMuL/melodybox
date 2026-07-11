@@ -18,9 +18,12 @@ import type { SystemSettings } from "@/types";
 export default function Settings() {
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [testResult, setTestResult] = useState<{
     path: string;
     accessible: boolean;
+    writable?: boolean;
+    message?: string;
     fileCount?: number;
     error?: string;
   } | null>(null);
@@ -37,15 +40,32 @@ export default function Settings() {
   const handleSave = async () => {
     if (!settings) return;
     setSaving(true);
-    await api.settings.update(settings);
-    setSaving(false);
+    setSaveMsg(null);
+    try {
+      await api.settings.update(settings);
+      setSaveMsg({ type: "success", text: "配置已保存" });
+      setTimeout(() => setSaveMsg(null), 3000);
+    } catch (err) {
+      setSaveMsg({ type: "error", text: `保存失败: ${err instanceof Error ? err.message : String(err)}` });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleTestDir = async (path: string) => {
     setTesting(true);
-    const res = await api.settings.testDir(path);
-    setTestResult({ path, ...res });
-    setTesting(false);
+    try {
+      const res = await api.settings.testDir(path);
+      setTestResult({ path, ...res });
+    } catch (err) {
+      setTestResult({
+        path,
+        accessible: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setTesting(false);
+    }
   };
 
   if (!settings) {
@@ -164,7 +184,19 @@ export default function Settings() {
       </div>
 
       {/* 保存按钮 */}
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-3">
+        {saveMsg && (
+          <span
+            className={cn(
+              "text-sm font-medium",
+              saveMsg.type === "success"
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-red-500"
+            )}
+          >
+            {saveMsg.text}
+          </span>
+        )}
         <button
           onClick={handleSave}
           disabled={saving}
@@ -193,7 +225,7 @@ function DirField({
   label: string;
   value: string;
   onChange: (v: string) => void;
-  testResult: { path: string; accessible: boolean; fileCount?: number; error?: string } | null;
+  testResult: { path: string; accessible: boolean; writable?: boolean; message?: string; fileCount?: number; error?: string } | null;
   testing: boolean;
   onTest: (path: string) => void;
 }) {
@@ -224,26 +256,23 @@ function DirField({
           测试
         </button>
       </div>
-      {showResult && (
+      {showResult && testResult && (
         <div
           className={cn(
             "mt-2 flex items-center gap-1.5 text-xs",
             testResult.accessible
-              ? "text-emerald-600 dark:text-emerald-400"
+              ? testResult.writable
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-amber-600 dark:text-amber-400"
               : "text-red-500"
           )}
         >
           {testResult.accessible ? (
-            <>
-              <CheckCircle2 className="h-4 w-4" />
-              目录可访问，包含 {testResult.fileCount} 个文件
-            </>
+            <CheckCircle2 className="h-4 w-4" />
           ) : (
-            <>
-              <XCircle className="h-4 w-4" />
-              {testResult.error || "目录不可访问"}
-            </>
+            <XCircle className="h-4 w-4" />
           )}
+          {testResult.message || testResult.error || (testResult.accessible ? "目录可访问" : "目录不可访问")}
         </div>
       )}
     </div>

@@ -146,12 +146,14 @@ export const api = {
       withFallback(
         () =>
           client
-            .post<{ accessible: boolean; fileCount?: number; error?: string }>(
-              "/settings/test-dir",
-              { path }
-            )
+            .post<{
+              accessible: boolean;
+              writable: boolean;
+              message: string;
+              fileCount: number;
+            }>("/settings/test-dir", { path })
             .then((r) => r.data),
-        { accessible: false, error: "开发模式：无法访问目录" }
+        { accessible: false, writable: false, message: "开发模式：无法访问目录", fileCount: 0 }
       ),
   },
 
