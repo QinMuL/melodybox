@@ -1,16 +1,31 @@
-"""Pydantic 请求/响应模型定义。"""
+"""Pydantic 请求/响应模型定义。
+
+所有模型继承 CamelModel，字段名使用 snake_case（与 ORM 模型一致），
+通过 alias_generator 自动生成 camelCase alias，JSON 输出时使用 alias。
+"""
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
+
+
+class CamelModel(BaseModel):
+    """基类：自动生成 camelCase alias，支持从 ORM 属性读取。"""
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 
 # ---------------- 通用响应 ----------------
 
 
-class MessageResponse(BaseModel):
+class MessageResponse(CamelModel):
     """通用消息响应。"""
 
     message: str
@@ -20,18 +35,18 @@ class MessageResponse(BaseModel):
 # ---------------- 音乐库 ----------------
 
 
-class StatsResponse(BaseModel):
+class StatsResponse(CamelModel):
     """音乐库统计。"""
 
-    totalSongs: int = 0
-    totalArtists: int = 0
-    totalAlbums: int = 0
-    totalDuplicates: int = 0
-    totalSize: int = 0
-    formatBreakdown: Dict[str, int] = Field(default_factory=dict)
+    total_songs: int = 0
+    total_artists: int = 0
+    total_albums: int = 0
+    total_duplicates: int = 0
+    total_size: int = 0
+    format_breakdown: Dict[str, int] = Field(default_factory=dict)
 
 
-class ArtistItem(BaseModel):
+class ArtistItem(CamelModel):
     id: str
     name: str
     name_normalized: Optional[str] = None
@@ -40,11 +55,8 @@ class ArtistItem(BaseModel):
     song_count: int = 0
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
 
-
-class AlbumItem(BaseModel):
+class AlbumItem(CamelModel):
     id: str
     artist_id: str
     title: str
@@ -54,11 +66,8 @@ class AlbumItem(BaseModel):
     song_count: int = 0
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
 
-
-class SongItem(BaseModel):
+class SongItem(CamelModel):
     id: str
     album_id: str
     title: str
@@ -74,30 +83,27 @@ class SongItem(BaseModel):
     file_modified: Optional[datetime] = None
     indexed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
 
-
-class ArtistListResponse(BaseModel):
+class ArtistListResponse(CamelModel):
     """艺术家分页列表。"""
 
     items: List[ArtistItem]
     total: int
-    page: int
-    pageSize: int
+    page: int = 1
+    page_size: int = 50
 
 
-class AlbumListResponse(BaseModel):
+class AlbumListResponse(CamelModel):
     items: List[AlbumItem]
     total: int
 
 
-class SongListResponse(BaseModel):
+class SongListResponse(CamelModel):
     items: List[SongItem]
     total: int
 
 
-class SearchResultItem(BaseModel):
+class SearchResultItem(CamelModel):
     """搜索结果项（type 标识实体类型）。"""
 
     type: str  # artist | album | song
@@ -106,7 +112,7 @@ class SearchResultItem(BaseModel):
     detail: Optional[str] = None
 
 
-class SearchResponse(BaseModel):
+class SearchResponse(CamelModel):
     items: List[SearchResultItem]
     total: int
 
@@ -114,34 +120,34 @@ class SearchResponse(BaseModel):
 # ---------------- 整理任务 ----------------
 
 
-class OrganizeConfig(BaseModel):
+class OrganizeConfig(CamelModel):
     """整理配置。"""
 
-    inputDir: str
-    outputDir: str
-    recycleDir: str
-    namingTemplate: str = "{artist}/{album}/{track:02d}-{title}.{ext}"
-    moveInsteadOfCopy: bool = False
-    overwritePolicy: str = "skip"  # skip | overwrite | rename
-    excludePatterns: List[str] = Field(default_factory=list)
+    input_dir: str
+    output_dir: str
+    recycle_dir: str
+    naming_template: str = "{artist}/{album}/{track:02d}-{title}.{ext}"
+    move_instead_of_copy: bool = False
+    overwrite_policy: str = "skip"  # skip | overwrite | rename
+    exclude_patterns: List[str] = Field(default_factory=list)
 
 
-class PreviewRequest(BaseModel):
+class PreviewRequest(CamelModel):
     """预览整理请求。"""
 
-    inputDir: Optional[str] = None
-    outputDir: Optional[str] = None
-    namingTemplate: Optional[str] = None
-    moveInsteadOfCopy: Optional[bool] = None
-    overwritePolicy: Optional[str] = None
-    excludePatterns: Optional[List[str]] = None
+    input_dir: Optional[str] = None
+    output_dir: Optional[str] = None
+    naming_template: Optional[str] = None
+    move_instead_of_copy: Optional[bool] = None
+    overwrite_policy: Optional[str] = None
+    exclude_patterns: Optional[List[str]] = None
 
 
-class PreviewItem(BaseModel):
+class PreviewItem(CamelModel):
     """单个文件预览结果。"""
 
-    source: str
-    target: str
+    old_path: str
+    new_path: str
     action: str  # move | copy | skip
     reason: Optional[str] = None
     artist: Optional[str] = None
@@ -150,19 +156,19 @@ class PreviewItem(BaseModel):
     track_number: Optional[int] = None
 
 
-class PreviewResponse(BaseModel):
-    items: List[PreviewItem]
-    total: int
+class PreviewResponse(CamelModel):
+    changes: List[PreviewItem]
+    total_changes: int
     skipped: int
 
 
-class StartTaskRequest(BaseModel):
+class StartTaskRequest(CamelModel):
     """启动整理任务请求。"""
 
     config: Optional[OrganizeConfig] = None
 
 
-class TaskStatusResponse(BaseModel):
+class TaskStatusResponse(CamelModel):
     id: str
     task_type: str
     status: str
@@ -175,28 +181,25 @@ class TaskStatusResponse(BaseModel):
     completed_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
 
-
-class TaskListResponse(BaseModel):
+class TaskListResponse(CamelModel):
     items: List[TaskStatusResponse]
     total: int
-    page: int
-    pageSize: int
+    page: int = 1
+    page_size: int = 10
 
 
-class StartTaskResponse(BaseModel):
+class StartTaskResponse(CamelModel):
     """启动任务响应。"""
 
-    taskId: str
+    task_id: str
     status: str
 
 
 # ---------------- 去重 ----------------
 
 
-class DuplicateGroupItem(BaseModel):
+class DuplicateGroupItem(CamelModel):
     """重复组中的单首歌曲项。"""
 
     song_id: str
@@ -209,7 +212,7 @@ class DuplicateGroupItem(BaseModel):
     recommended: bool = False  # 是否推荐保留
 
 
-class DuplicateGroupResponse(BaseModel):
+class DuplicateGroupResponse(CamelModel):
     """重复组详情。"""
 
     id: str
@@ -220,41 +223,41 @@ class DuplicateGroupResponse(BaseModel):
     files: List[DuplicateGroupItem] = Field(default_factory=list)
 
 
-class DuplicateGroupListResponse(BaseModel):
+class DuplicateGroupListResponse(CamelModel):
     items: List[DuplicateGroupResponse]
     total: int
-    page: int
-    pageSize: int
+    page: int = 1
+    page_size: int = 20
 
 
-class ResolveDuplicateRequest(BaseModel):
+class ResolveDuplicateRequest(CamelModel):
     """处理重复组请求。"""
 
-    keepFileId: str
+    keep_file_id: str
     action: str = "recycle"  # recycle | delete
 
 
 # ---------------- 设置 ----------------
 
 
-class SystemSettings(BaseModel):
+class SystemSettings(CamelModel):
     """系统配置。"""
 
-    inputDir: str
-    outputDir: str
-    recycleDir: str
-    dbPath: str
-    logLevel: str
-    supportedFormats: List[str] = Field(default_factory=list)
+    input_dir: str
+    output_dir: str
+    recycle_dir: str
+    db_path: str
+    log_level: str
+    supported_formats: List[str] = Field(default_factory=list)
     concurrency: int = 4
 
 
-class TestDirRequest(BaseModel):
+class TestDirRequest(CamelModel):
     path: str
 
 
-class TestDirResponse(BaseModel):
+class TestDirResponse(CamelModel):
     accessible: bool
     writable: bool
     message: str
-    fileCount: int = 0
+    file_count: int = 0

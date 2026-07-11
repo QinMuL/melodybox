@@ -43,12 +43,12 @@ def get_settings() -> SystemSettings:
     """
     saved = load_organize_config()
     return SystemSettings(
-        inputDir=saved.get("inputDir") or settings.MUSIC_INPUT_DIR,
-        outputDir=saved.get("outputDir") or settings.MUSIC_OUTPUT_DIR,
-        recycleDir=saved.get("recycleDir") or settings.MUSIC_RECYCLE_DIR,
-        dbPath=settings.DB_PATH,
-        logLevel=settings.LOG_LEVEL,
-        supportedFormats=SUPPORTED_FORMATS,
+        input_dir=saved.get("inputDir") or settings.MUSIC_INPUT_DIR,
+        output_dir=saved.get("outputDir") or settings.MUSIC_OUTPUT_DIR,
+        recycle_dir=saved.get("recycleDir") or settings.MUSIC_RECYCLE_DIR,
+        db_path=settings.DB_PATH,
+        log_level=settings.LOG_LEVEL,
+        supported_formats=SUPPORTED_FORMATS,
         concurrency=4,
     )
 
@@ -61,25 +61,25 @@ def update_settings(cfg: SystemSettings) -> SystemSettings:
     注意：环境变量级别的配置（如 LOG_LEVEL、DB_PATH）运行时不可变。
     """
     saved = load_organize_config()
-    # 合并用户修改的目录字段到整理配置中
-    saved["inputDir"] = cfg.inputDir
-    saved["outputDir"] = cfg.outputDir
-    saved["recycleDir"] = cfg.recycleDir
+    # 合并用户修改的目录字段到整理配置中（使用 camelCase key 保持一致性）
+    saved["inputDir"] = cfg.input_dir
+    saved["outputDir"] = cfg.output_dir
+    saved["recycleDir"] = cfg.recycle_dir
     save_organize_config(saved)
 
     # 自动创建回收站目录（如果用户指定了新路径）
     try:
-        ensure_dir(cfg.recycleDir)
+        ensure_dir(cfg.recycle_dir)
     except OSError:
         pass  # 创建失败不阻塞保存
 
     return SystemSettings(
-        inputDir=cfg.inputDir,
-        outputDir=cfg.outputDir,
-        recycleDir=cfg.recycleDir,
-        dbPath=settings.DB_PATH,
-        logLevel=settings.LOG_LEVEL,
-        supportedFormats=SUPPORTED_FORMATS,
+        input_dir=cfg.input_dir,
+        output_dir=cfg.output_dir,
+        recycle_dir=cfg.recycle_dir,
+        db_path=settings.DB_PATH,
+        log_level=settings.LOG_LEVEL,
+        supported_formats=SUPPORTED_FORMATS,
         concurrency=cfg.concurrency,
     )
 

@@ -160,8 +160,10 @@ def scan_directory(
     Returns:
         (indexed_count, total_count) 已索引数与总数
     """
+    logger.info("开始扫描目录: %s (计算哈希: %s)", directory, compute_hash)
     files = find_audio_files(directory, exclude_patterns)
     total = len(files)
+    logger.info("发现 %d 个音频文件", total)
     indexed = 0
 
     for idx, file_path in enumerate(files, start=1):
@@ -176,6 +178,7 @@ def scan_directory(
 
     _recompute_counts(db)
     db.commit()
+    logger.info("扫描完成：共 %d 个文件，成功入库 %d 个", total, indexed)
     return indexed, total
 
 

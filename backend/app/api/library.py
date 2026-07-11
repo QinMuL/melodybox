@@ -57,12 +57,12 @@ def get_stats(db: Session = Depends(get_db)) -> StatsResponse:
     }
 
     return StatsResponse(
-        totalSongs=total_songs,
-        totalArtists=total_artists,
-        totalAlbums=total_albums,
-        totalDuplicates=total_duplicates,
-        totalSize=int(total_size),
-        formatBreakdown=format_breakdown,
+        total_songs=total_songs,
+        total_artists=total_artists,
+        total_albums=total_albums,
+        total_duplicates=total_duplicates,
+        total_size=int(total_size),
+        format_breakdown=format_breakdown,
     )
 
 
@@ -90,7 +90,7 @@ def list_artists(
         items=[ArtistItem.model_validate(a) for a in items],
         total=total,
         page=page,
-        pageSize=pageSize,
+        page_size=pageSize,
     )
 
 

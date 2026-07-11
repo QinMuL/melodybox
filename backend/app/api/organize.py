@@ -30,13 +30,13 @@ router = APIRouter(prefix="/organize", tags=["organize"])
 def get_organize_config() -> OrganizeConfig:
     """获取整理配置。"""
     config = load_organize_config()
-    return OrganizeConfig(**config)
+    return OrganizeConfig.model_validate(config)
 
 
 @router.put("/config", response_model=OrganizeConfig)
 def update_organize_config(config: OrganizeConfig) -> OrganizeConfig:
     """更新整理配置（持久化到 config.json）。"""
-    save_organize_config(config.model_dump())
+    save_organize_config(config.model_dump(by_alias=True))
     return config
 
 
@@ -44,12 +44,12 @@ def update_organize_config(config: OrganizeConfig) -> OrganizeConfig:
 def preview(req: PreviewRequest, db: Session = Depends(get_db)) -> PreviewResponse:
     """预览整理结果（dryRun，不实际操作文件）。"""
     saved = load_organize_config()
-    input_dir = req.inputDir or saved["inputDir"]
-    output_dir = req.outputDir or saved["outputDir"]
-    template = req.namingTemplate or saved["namingTemplate"]
-    move = req.moveInsteadOfCopy if req.moveInsteadOfCopy is not None else saved["moveInsteadOfCopy"]
-    policy = req.overwritePolicy or saved["overwritePolicy"]
-    exclude_patterns = req.excludePatterns if req.excludePatterns is not None else saved["excludePatterns"]
+    input_dir = req.input_dir or saved.get("inputDir") or saved.get("input_dir") or "/music"
+    output_dir = req.output_dir or saved.get("outputDir") or saved.get("output_dir") or "/music"
+    template = req.naming_template or saved.get("namingTemplate") or saved.get("naming_template") or "{artist}/{album}/{track:02d}-{title}.{ext}"
+    move = req.move_instead_of_copy if req.move_instead_of_copy is not None else saved.get("moveInsteadOfCopy", saved.get("move_instead_of_copy", False))
+    policy = req.overwrite_policy or saved.get("overwritePolicy") or saved.get("overwrite_policy") or "skip"
+    exclude_patterns = req.exclude_patterns if req.exclude_patterns is not None else (saved.get("excludePatterns") or saved.get("exclude_patterns") or [])
 
     items: list[PreviewItem] = organize_service.preview(
         input_dir=input_dir,
@@ -60,7 +60,7 @@ def preview(req: PreviewRequest, db: Session = Depends(get_db)) -> PreviewRespon
         exclude_patterns=exclude_patterns,
     )
     skipped = sum(1 for i in items if i.action == "skip")
-    return PreviewResponse(items=items, total=len(items), skipped=skipped)
+    return PreviewResponse(changes=items, total_changes=len(items), skipped=skipped)
 
 
 @router.post("/start", response_model=StartTaskResponse)

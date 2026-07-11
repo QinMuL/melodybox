@@ -97,6 +97,19 @@ def create_app() -> FastAPI:
     def root() -> dict:
         return {"service": "MelodyBox", "docs": "/docs"}
 
+    # 请求日志中间件
+    @app.middleware("http")
+    async def log_requests(request, call_next):
+        response = await call_next(request)
+        # 只记录 API 请求（排除静态文件和健康检查）
+        path = request.url.path
+        if path.startswith("/api/") and path != "/api/logs/":
+            logger.info(
+                "%s %s -> %s",
+                request.method, path, response.status_code,
+            )
+        return response
+
     return app
 
 

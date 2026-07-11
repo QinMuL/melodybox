@@ -106,8 +106,8 @@ def preview(
         )
         items.append(
             PreviewItem(
-                source=file_path,
-                target=final_target,
+                old_path=file_path,
+                new_path=final_target,
                 action=action,
                 reason=reason,
                 artist=data["artist"],

@@ -97,6 +97,7 @@ def detect_duplicates(
         包含 groups（重复组数）、duplicates（重复文件数）的字典
     """
     # 重新扫描并索引（确保 songs 表是最新的，并计算 hash）
+    logger.info("去重扫描：重新索引文件并计算哈希...")
     scan_service.scan_directory(
         db, directory, exclude_patterns, compute_hash=True,
         on_progress=on_progress,
@@ -106,6 +107,7 @@ def detect_duplicates(
 
     # 取出所有歌曲
     songs = db.query(Song).all()
+    logger.info("去重分析：共 %d 首歌曲", len(songs))
 
     # 第一级：按 file_hash 分组
     hash_groups: Dict[str, List[Song]] = defaultdict(list)
@@ -170,6 +172,7 @@ def detect_duplicates(
         group_count += 1
 
     db.commit()
+    logger.info("去重完成：发现 %d 个重复组，%d 个重复文件", group_count, duplicate_count)
     return {"groups": group_count, "duplicates": duplicate_count}
 
 
@@ -214,11 +217,18 @@ async def run_duplicate_scan_task(
             if total <= 0:
                 return
             progress = processed / total * 100
-            # 这里同步更新内存进度（在 executor 线程中调用）
+            # 更新内存进度（在 executor 线程中调用）
             task_manager._progress[task_id]["progress"] = progress
             task_manager._progress[task_id]["processed_files"] = processed
             task_manager._progress[task_id]["total_files"] = total
             task_manager._progress[task_id]["current_file"] = current
+            # 同步更新数据库中的任务记录（前端轮询数据库查询进度）
+            if task is not None:
+                task.progress = progress
+                task.processed_files = processed
+                task.total_files = total
+                task.current_file = current
+                db.commit()
 
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
