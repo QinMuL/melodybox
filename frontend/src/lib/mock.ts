@@ -10,7 +10,18 @@ import type {
   SystemSettings,
 } from "@/types";
 
-export const mockData = {
+export const mockData: {
+  stats: LibraryStats;
+  artists: Artist[];
+  albums: Album[];
+  songs: Song[];
+  organizeConfig: OrganizeConfig;
+  previewResult: PreviewResult;
+  task: OrganizeTask;
+  recentTasks: OrganizeTask[];
+  duplicateGroups: DuplicateGroup[];
+  settings: SystemSettings;
+} = {
   stats: {
     totalSongs: 12847,
     totalArtists: 326,
@@ -24,7 +35,7 @@ export const mockData = {
       { format: "M4A", count: 512 },
       { format: "WAV", count: 186 },
     ],
-  } as LibraryStats,
+  },
 
   artists: [
     { id: "a1", name: "周杰伦", albumCount: 16, songCount: 234, coverUrl: "" },
@@ -39,7 +50,7 @@ export const mockData = {
     { id: "a10", name: "毛不易", albumCount: 5, songCount: 54, coverUrl: "" },
     { id: "a11", name: "华晨宇", albumCount: 6, songCount: 68, coverUrl: "" },
     { id: "a12", name: "王菲", albumCount: 22, songCount: 198, coverUrl: "" },
-  ] as Artist[],
+  ],
 
   albums: [
     { id: "al1", artistId: "a1", title: "范特西", year: 2001, songCount: 10, coverUrl: "" },
@@ -54,7 +65,7 @@ export const mockData = {
     { id: "al10", artistId: "a5", title: "自传", year: 2016, songCount: 12, coverUrl: "" },
     { id: "al11", artistId: "a6", title: "1989", year: 2014, songCount: 13, coverUrl: "" },
     { id: "al12", artistId: "a7", title: "25", year: 2015, songCount: 11, coverUrl: "" },
-  ] as Album[],
+  ],
 
   songs: [
     { id: "s1", albumId: "al1", title: "简单爱", trackNumber: 3, duration: 273, format: "FLAC", bitrate: 992, sampleRate: 44100, channels: 2, filePath: "/music/周杰伦/范特西/03-简单爱.flac", fileSize: 34_560_000 },
@@ -63,7 +74,7 @@ export const mockData = {
     { id: "s4", albumId: "al1", title: "忍者", trackNumber: 4, duration: 162, format: "FLAC", bitrate: 992, sampleRate: 44100, channels: 2, filePath: "/music/周杰伦/范特西/04-忍者.flac", fileSize: 20_160_000 },
     { id: "s5", albumId: "al1", title: "双截棍", trackNumber: 6, duration: 264, format: "FLAC", bitrate: 992, sampleRate: 44100, channels: 2, filePath: "/music/周杰伦/范特西/06-双截棍.flac", fileSize: 33_000_000 },
     { id: "s6", albumId: "al1", title: "安静", trackNumber: 10, duration: 312, format: "FLAC", bitrate: 992, sampleRate: 44100, channels: 2, filePath: "/music/周杰伦/范特西/10-安静.flac", fileSize: 39_000_000 },
-  ] as Song[],
+  ],
 
   organizeConfig: {
     inputDir: "/music",
@@ -71,43 +82,43 @@ export const mockData = {
     recycleDir: "/music/.recycle",
     namingTemplate: "{artist}/{album}/{track:02d}-{title}",
     moveInsteadOfCopy: true,
-    overwritePolicy: "skip" as const,
+    overwritePolicy: "skip",
     excludePatterns: ["*.tmp", "*.bak", ".DS_Store"],
-  } as OrganizeConfig,
+  },
 
   previewResult: {
     changes: [
-      { oldPath: "/music/周杰伦 - 简单爱.flac", newPath: "/music/周杰伦/范特西/03-简单爱.flac", action: "rename" as const, reason: "按元数据规范化文件名和目录" },
-      { oldPath: "/music/unknown_track.mp3", newPath: "/music/周杰伦/范特西/01-爱在西元前.mp3", action: "rename" as const, reason: "元数据补全并规范化" },
-      { oldPath: "/music/双截棍.flac", newPath: "/music/周杰伦/范特西/06-双截棍.flac", action: "move" as const, reason: "移动到对应艺术家专辑目录" },
+      { oldPath: "/music/周杰伦 - 简单爱.flac", newPath: "/music/周杰伦/范特西/03-简单爱.flac", action: "rename", reason: "按元数据规范化文件名和目录" },
+      { oldPath: "/music/unknown_track.mp3", newPath: "/music/周杰伦/范特西/01-爱在西元前.mp3", action: "rename", reason: "元数据补全并规范化" },
+      { oldPath: "/music/双截棍.flac", newPath: "/music/周杰伦/范特西/06-双截棍.flac", action: "move", reason: "移动到对应艺术家专辑目录" },
     ],
     totalChanges: 3,
-  } as PreviewResult,
+  },
 
   task: {
     id: "task-001",
-    taskType: "organize" as const,
-    status: "running" as const,
+    taskType: "organize",
+    status: "running",
     progress: 67,
     currentFile: "/music/周杰伦/范特西/06-双截棍.flac",
     totalFiles: 12847,
     processedFiles: 8607,
     logs: [
-      { time: "2026-07-11 10:00:00", level: "info" as const, message: "开始扫描音乐目录 /music" },
-      { time: "2026-07-11 10:00:05", level: "info" as const, message: "发现 12847 个音频文件" },
-      { time: "2026-07-11 10:00:10", level: "info" as const, message: "正在处理: 周杰伦 - 简单爱.flac" },
-      { time: "2026-07-11 10:00:15", level: "info" as const, message: "重命名: 周杰伦 - 简单爱.flac → 范特西/03-简单爱.flac" },
-      { time: "2026-07-11 10:15:00", level: "warning" as const, message: "元数据缺失: unknown_track.mp3，尝试在线查询" },
-      { time: "2026-07-11 10:15:05", level: "info" as const, message: "MusicBrainz 匹配成功: 爱在西元前" },
+      { time: "2026-07-11 10:00:00", level: "info", message: "开始扫描音乐目录 /music" },
+      { time: "2026-07-11 10:00:05", level: "info", message: "发现 12847 个音频文件" },
+      { time: "2026-07-11 10:00:10", level: "info", message: "正在处理: 周杰伦 - 简单爱.flac" },
+      { time: "2026-07-11 10:00:15", level: "info", message: "重命名: 周杰伦 - 简单爱.flac → 范特西/03-简单爱.flac" },
+      { time: "2026-07-11 10:15:00", level: "warning", message: "元数据缺失: unknown_track.mp3，尝试在线查询" },
+      { time: "2026-07-11 10:15:05", level: "info", message: "MusicBrainz 匹配成功: 爱在西元前" },
     ],
     startedAt: "2026-07-11T10:00:00",
-  } as OrganizeTask,
+  },
 
   recentTasks: [
-    { id: "task-001", taskType: "organize" as const, status: "running" as const, progress: 67, currentFile: "/music/周杰伦/范特西/06-双截棍.flac", totalFiles: 12847, processedFiles: 8607, logs: [], startedAt: "2026-07-11T10:00:00" },
-    { id: "task-002", taskType: "duplicate_scan" as const, status: "completed" as const, progress: 100, totalFiles: 12847, processedFiles: 12847, logs: [], startedAt: "2026-07-10T15:00:00", completedAt: "2026-07-10T15:30:00" },
-    { id: "task-003", taskType: "organize" as const, status: "completed" as const, progress: 100, totalFiles: 8500, processedFiles: 8500, logs: [], startedAt: "2026-07-09T09:00:00", completedAt: "2026-07-09T09:45:00" },
-  ] as OrganizeTask[],
+    { id: "task-001", taskType: "organize", status: "running", progress: 67, currentFile: "/music/周杰伦/范特西/06-双截棍.flac", totalFiles: 12847, processedFiles: 8607, logs: [], startedAt: "2026-07-11T10:00:00" },
+    { id: "task-002", taskType: "duplicate_scan", status: "completed", progress: 100, totalFiles: 12847, processedFiles: 12847, logs: [], startedAt: "2026-07-10T15:00:00", completedAt: "2026-07-10T15:30:00" },
+    { id: "task-003", taskType: "organize", status: "completed", progress: 100, totalFiles: 8500, processedFiles: 8500, logs: [], startedAt: "2026-07-09T09:00:00", completedAt: "2026-07-09T09:45:00" },
+  ],
 
   duplicateGroups: [
     {
@@ -135,15 +146,17 @@ export const mockData = {
         { id: "df7", filePath: "/music/下载/江南.m4a", title: "江南", artist: "林俊杰", format: "M4A", bitrate: 256, sampleRate: 44100, fileSize: 8_960_000, modifiedAt: "2025-10-15", recommended: false },
       ],
     },
-  ] as DuplicateGroup[],
+  ],
 
   settings: {
     inputDir: "/music",
     outputDir: "/music",
     recycleDir: "/music/.recycle",
     dbPath: "/app/data/melodybox.db",
-    logLevel: "info" as const,
+    logLevel: "info",
     supportedFormats: ["MP3", "FLAC", "APE", "WAV", "M4A", "OGG", "OPUS"],
     concurrency: 4,
-  } as SystemSettings,
+  },
 };
+
+export default mockData;

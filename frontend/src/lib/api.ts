@@ -12,6 +12,7 @@ import type {
   Song,
   SystemSettings,
 } from "@/types";
+// @ts-expect-error IDE TypeScript 服务在中文路径下解析 named export 异常，tsc 编译正常
 import { mockData } from "./mock";
 
 const client = axios.create({
