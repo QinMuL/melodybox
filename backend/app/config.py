@@ -28,7 +28,8 @@ class Settings:
     # 音乐目录
     MUSIC_INPUT_DIR: str = os.environ.get("MUSIC_INPUT_DIR", "/music")
     MUSIC_OUTPUT_DIR: str = os.environ.get("MUSIC_OUTPUT_DIR", "/music")
-    MUSIC_RECYCLE_DIR: str = os.environ.get("MUSIC_RECYCLE_DIR", "/music/.recycle")
+    # 回收站默认放在项目数据目录下，由 docker-compose 的 ./data:/app/data 卷映射到宿主机
+    MUSIC_RECYCLE_DIR: str = os.environ.get("MUSIC_RECYCLE_DIR", "/app/data/recycle")
 
     # 数据库
     DB_PATH: str = os.environ.get("DB_PATH", str(DATA_DIR / "melodybox.db"))
@@ -41,12 +42,15 @@ class Settings:
 DEFAULT_ORGANIZE_CONFIG: Dict[str, Any] = {
     "inputDir": os.environ.get("MUSIC_INPUT_DIR", "/music"),
     "outputDir": os.environ.get("MUSIC_OUTPUT_DIR", "/music"),
-    "recycleDir": os.environ.get("MUSIC_RECYCLE_DIR", "/music/.recycle"),
+    "recycleDir": os.environ.get("MUSIC_RECYCLE_DIR", "/app/data/recycle"),
     "namingTemplate": "{artist}/{album}/{track:02d}-{title}.{ext}",
     "moveInsteadOfCopy": True,
     "overwritePolicy": "skip",  # skip | overwrite | rename
     "excludePatterns": [],  # 排除模式列表
 }
+
+# 旧版默认回收站路径，加载时自动迁移到新路径
+_LEGACY_RECYCLE_DIRS = {"/music/.recycle"}
 
 
 def load_organize_config() -> Dict[str, Any]:
@@ -58,6 +62,16 @@ def load_organize_config() -> Dict[str, Any]:
             # 与默认配置合并，保证新增字段有默认值
             merged = dict(DEFAULT_ORGANIZE_CONFIG)
             merged.update(data.get("organize", {}))
+            # 旧版默认值迁移：如果 recycleDir 是旧的 /music/.recycle，自动迁移到新默认
+            if merged.get("recycleDir") in _LEGACY_RECYCLE_DIRS:
+                merged["recycleDir"] = DEFAULT_ORGANIZE_CONFIG["recycleDir"]
+                # 同步写回文件持久化迁移结果
+                data["organize"] = merged
+                try:
+                    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                        json.dump(data, f, ensure_ascii=False, indent=2)
+                except OSError:
+                    pass
             return merged
         except (json.JSONDecodeError, OSError):
             return dict(DEFAULT_ORGANIZE_CONFIG)

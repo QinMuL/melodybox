@@ -40,8 +40,10 @@ RUN rm -f /etc/nginx/sites-enabled/default
 COPY docker/start.sh /start.sh
 RUN chmod +x /start.sh
 
-# 数据与配置目录
-RUN mkdir -p /app/data
+# 数据与配置目录（回收站也放这里，构建时预创建）
+# 注意：docker-compose 挂载 ./data:/app/data 后，挂载点会覆盖镜像内容，
+# 所以 start.sh 还会在启动时再 mkdir 一次保证目录存在
+RUN mkdir -p /app/data /app/data/recycle /app/data/logs /app/data/covers
 
 EXPOSE 28080
 

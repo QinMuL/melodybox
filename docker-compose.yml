@@ -23,7 +23,7 @@ services:
       - TZ=Asia/Shanghai
       - MUSIC_INPUT_DIR=/music
       - MUSIC_OUTPUT_DIR=/music
-      - MUSIC_RECYCLE_DIR=/music/.recycle
+      - MUSIC_RECYCLE_DIR=/app/data/recycle
       - DB_PATH=/app/data/melodybox.db
       - CONFIG_FILE=/app/data/config.json
       - LOG_LEVEL=info
