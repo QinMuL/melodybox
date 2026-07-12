@@ -45,6 +45,9 @@ RUN chmod +x /start.sh
 # 所以 start.sh 还会在启动时再 mkdir 一次保证目录存在
 RUN mkdir -p /app/data /app/data/recycle /app/data/logs /app/data/covers
 
+# 默认环境变量：数据目录指向 /app/data（与 Docker 卷挂载对应）
+ENV MUSIC_DATA_DIR=/app/data
+
 EXPOSE 28080
 
 CMD ["/start.sh"]

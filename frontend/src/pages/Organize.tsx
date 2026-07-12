@@ -53,7 +53,7 @@ function OperationCard({ mode }: { mode: Mode }) {
   const [task, setTask] = useState<OrganizeTask | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
 
-  // 执行任务后轮询状态
+  // 执行任务后轮询状态（依赖 task?.id 而非 task，避免每次 setTask 都重跑 effect）
   useEffect(() => {
     if (!task) return;
     // 任务已结束：确保 executing 关闭
@@ -61,16 +61,24 @@ function OperationCard({ mode }: { mode: Mode }) {
       setExecuting(false);
       return;
     }
+    const taskId = task.id;
     const timer = setInterval(async () => {
-      const t = await api.organize.task(task.id);
-      setTask(t);
-      if (t.status === "completed" || t.status === "failed") {
+      try {
+        const t = await api.organize.task(taskId);
+        setTask(t);
+        if (t.status === "completed" || t.status === "failed") {
+          clearInterval(timer);
+          setExecuting(false);
+        }
+      } catch {
+        // API 失败：停止轮询并恢复按钮状态
         clearInterval(timer);
         setExecuting(false);
       }
     }, 1500);
     return () => clearInterval(timer);
-  }, [task]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id]);
 
   async function handlePreview() {
     setLoading(true);
@@ -419,6 +427,25 @@ function PreviewRow({ index, item }: { index: number; item: PreviewChange }) {
             )}
           </div>
         </div>
+        {/* 附属文件（如 -mediainfo.json） */}
+        {item.companions && item.companions.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface-light/60 dark:bg-dark-hover/40">
+            <span className="shrink-0 text-[10px] font-medium text-ink-muted dark:text-ink-lightMuted">
+              附属文件
+            </span>
+            {item.companions.map((c, ci) => {
+              const cOld = splitPath(c.oldPath);
+              const cNew = splitPath(c.newPath);
+              return (
+                <span key={ci} className="inline-flex items-center gap-1 rounded bg-white/60 px-1.5 py-0.5 font-mono text-[10px] dark:bg-dark-card/60">
+                  <span className="break-all text-ink-muted dark:text-ink-lightMuted">{cOld.file}</span>
+                  <ArrowRight className="h-2.5 w-2.5 shrink-0 text-primary" />
+                  <span className="break-all font-medium text-primary">{cNew.file}</span>
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

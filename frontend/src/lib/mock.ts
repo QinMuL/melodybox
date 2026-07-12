@@ -124,27 +124,36 @@ export const mockData: {
   duplicateGroups: [
     {
       id: "dg1",
+      groupHash: "hash:abc1",
       similarity: 100,
+      status: "pending",
+      detectedAt: "2026-01-15T10:00:00",
       files: [
-        { id: "df1", filePath: "/music/周杰伦/范特西/03-简单爱.flac", title: "简单爱", artist: "周杰伦", format: "FLAC", bitrate: 992, sampleRate: 44100, fileSize: 34_560_000, modifiedAt: "2026-01-15", recommended: true },
-        { id: "df2", filePath: "/music/下载/简单爱.mp3", title: "简单爱", artist: "周杰伦", format: "MP3", bitrate: 320, sampleRate: 44100, fileSize: 10_920_000, modifiedAt: "2025-11-20", recommended: false },
+        { songId: "df1", filePath: "/music/周杰伦/范特西/03-简单爱.flac", title: "简单爱", artist: "周杰伦", format: "FLAC", bitrate: 992, sampleRate: 44100, fileSize: 34_560_000, fileModified: "2026-01-15", recommended: true },
+        { songId: "df2", filePath: "/music/下载/简单爱.mp3", title: "简单爱", artist: "周杰伦", format: "MP3", bitrate: 320, sampleRate: 44100, fileSize: 10_920_000, fileModified: "2025-11-20", recommended: false },
       ],
     },
     {
       id: "dg2",
+      groupHash: "hash:abc2",
       similarity: 98,
+      status: "pending",
+      detectedAt: "2026-02-01T10:00:00",
       files: [
-        { id: "df3", filePath: "/music/陈奕迅/U87/浮夸.flac", title: "浮夸", artist: "陈奕迅", format: "FLAC", bitrate: 992, sampleRate: 44100, fileSize: 38_400_000, modifiedAt: "2026-02-01", recommended: true },
-        { id: "df4", filePath: "/music/陈奕迅/精选/浮夸.mp3", title: "浮夸", artist: "陈奕迅", format: "MP3", bitrate: 320, sampleRate: 44100, fileSize: 11_280_000, modifiedAt: "2025-12-10", recommended: false },
-        { id: "df5", filePath: "/music/backup/浮夸.ape", title: "浮夸", artist: "陈奕迅", format: "APE", bitrate: 800, sampleRate: 44100, fileSize: 30_000_000, modifiedAt: "2025-08-05", recommended: false },
+        { songId: "df3", filePath: "/music/陈奕迅/U87/浮夸.flac", title: "浮夸", artist: "陈奕迅", format: "FLAC", bitrate: 992, sampleRate: 44100, fileSize: 38_400_000, fileModified: "2026-02-01", recommended: true },
+        { songId: "df4", filePath: "/music/陈奕迅/精选/浮夸.mp3", title: "浮夸", artist: "陈奕迅", format: "MP3", bitrate: 320, sampleRate: 44100, fileSize: 11_280_000, fileModified: "2025-12-10", recommended: false },
+        { songId: "df5", filePath: "/music/backup/浮夸.ape", title: "浮夸", artist: "陈奕迅", format: "APE", bitrate: 800, sampleRate: 44100, fileSize: 30_000_000, fileModified: "2025-08-05", recommended: false },
       ],
     },
     {
       id: "dg3",
+      groupHash: "hash:abc3",
       similarity: 95,
+      status: "pending",
+      detectedAt: "2026-03-01T10:00:00",
       files: [
-        { id: "df6", filePath: "/music/林俊杰/第二天堂/江南.flac", title: "江南", artist: "林俊杰", format: "FLAC", bitrate: 992, sampleRate: 44100, fileSize: 35_200_000, modifiedAt: "2026-03-01", recommended: true },
-        { id: "df7", filePath: "/music/下载/江南.m4a", title: "江南", artist: "林俊杰", format: "M4A", bitrate: 256, sampleRate: 44100, fileSize: 8_960_000, modifiedAt: "2025-10-15", recommended: false },
+        { songId: "df6", filePath: "/music/林俊杰/第二天堂/江南.flac", title: "江南", artist: "林俊杰", format: "FLAC", bitrate: 992, sampleRate: 44100, fileSize: 35_200_000, fileModified: "2026-03-01", recommended: true },
+        { songId: "df7", filePath: "/music/下载/江南.m4a", title: "江南", artist: "林俊杰", format: "M4A", bitrate: 256, sampleRate: 44100, fileSize: 8_960_000, fileModified: "2025-10-15", recommended: false },
       ],
     },
   ],

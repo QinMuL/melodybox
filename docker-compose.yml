@@ -21,6 +21,7 @@ services:
       - ./data:/app/data:rw
     environment:
       - TZ=Asia/Shanghai
+      - MUSIC_DATA_DIR=/app/data
       - MUSIC_INPUT_DIR=/music
       - MUSIC_OUTPUT_DIR=/music
       - MUSIC_RECYCLE_DIR=/app/data/recycle

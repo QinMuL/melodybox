@@ -13,12 +13,13 @@ import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List
 
 from sqlalchemy.orm import Session
 
 from app.models import OrganizeTask, TaskLog
-from app.schemas import PreviewItem
+from app.schemas import CompanionFile, PreviewItem
 from app.services import metadata_service
 from app.services.task_manager import (
     MSG_ERROR,
@@ -40,6 +41,9 @@ RENAME_TEMPLATE = "{artist} - {title}.{ext}"
 # 整理模板（organize 模式）：按艺术家/专辑/归类，保留原文件名
 ORGANIZE_TEMPLATE = "{artist}/{album}/{filename}"
 
+# 音频文件的附属文件后缀（移动/重命名时一并处理）
+COMPANION_SUFFIXES = ["-mediainfo.json"]
+
 
 def _build_render_data(metadata: Dict[str, Any], file_path: str) -> Dict[str, Any]:
     """构造模板渲染所需的数据字典。"""
@@ -54,6 +58,70 @@ def _build_render_data(metadata: Dict[str, Any], file_path: str) -> Dict[str, An
         "ext": get_audio_format(file_path) or "mp3",
         "filename": os.path.basename(file_path),  # 原文件名（organize 模式保留）
     }
+
+
+def _find_companion_files(file_path: str) -> List[str]:
+    """查找与音频文件同名的附属文件（如 song-mediainfo.json）。
+
+    音频文件 /path/to/song.flac 对应附属文件：
+    /path/to/song-mediainfo.json
+    """
+    stem, _ = os.path.splitext(file_path)
+    companions: List[str] = []
+    for suffix in COMPANION_SUFFIXES:
+        companion_path = f"{stem}{suffix}"
+        if os.path.exists(companion_path):
+            companions.append(companion_path)
+    return companions
+
+
+def _compute_companion_target(
+    companion_path: str,
+    source_audio: str,
+    target_audio: str,
+    mode: str,
+) -> str:
+    """计算附属文件的目标路径。
+
+    rename 模式：用音频文件的新 stem + 附属后缀
+      源：/dir/artist - song.flac           目标：/dir/newartist - new song.flac
+      附属：/dir/artist - song-mediainfo.json → /dir/newartist - new song-mediainfo.json
+
+    organize 模式：移动到音频目标目录，保留原附属文件名
+      源：/music/artist - song.flac         目标：/music/artist/album/artist - song.flac
+      附属：/music/artist - song-mediainfo.json → /music/artist/album/artist - song-mediainfo.json
+    """
+    if mode == "rename":
+        target_stem = os.path.splitext(target_audio)[0]
+        audio_stem = os.path.splitext(source_audio)[0]
+        companion_suffix = companion_path[len(audio_stem):]
+        return f"{target_stem}{companion_suffix}"
+    else:
+        target_dir = os.path.dirname(target_audio)
+        companion_name = os.path.basename(companion_path)
+        return os.path.join(target_dir, companion_name)
+
+
+def _cleanup_empty_dirs(root_dir: str) -> int:
+    """清理目录树中的空子目录，返回清理数量。"""
+    removed = 0
+    root = Path(root_dir)
+    if not root.exists():
+        return 0
+    # 从最深的目录开始检查（postorder 遍历）
+    for dirpath, dirnames, filenames in sorted(
+        os.walk(root_dir, topdown=False),
+        key=lambda x: -len(Path(x[0]).parts),
+    ):
+        if Path(dirpath) == root:
+            continue
+        try:
+            if not os.listdir(dirpath):
+                os.rmdir(dirpath)
+                removed += 1
+        except OSError:
+            pass
+    return removed
 
 
 def _compute_target(
@@ -162,6 +230,14 @@ def preview(
         final_target, action, reason = _decide_target(
             file_path, target, move, policy
         )
+        # 查找附属文件并计算目标路径
+        companions = [
+            CompanionFile(
+                old_path=c,
+                new_path=_compute_companion_target(c, file_path, final_target, mode),
+            )
+            for c in _find_companion_files(file_path)
+        ]
         items.append(
             PreviewItem(
                 old_path=file_path,
@@ -172,6 +248,7 @@ def preview(
                 album=data["album"],
                 title=data["title"],
                 track_number=data["track_number"],
+                companions=companions,
             )
         )
     return items
@@ -304,6 +381,30 @@ async def run_organize_task(
                     policy,
                 )
 
+                # 处理附属文件（如 -mediainfo.json）
+                companions_processed = 0
+                if err is None and action != "skip":
+                    for companion in _find_companion_files(file_path):
+                        companion_target = _compute_companion_target(
+                            companion, file_path, final_target, mode
+                        )
+                        ct, ca, _ = _decide_target(
+                            companion, companion_target, move, policy
+                        )
+                        _, ce = await loop.run_in_executor(
+                            executor,
+                            _process_single_file,
+                            companion,
+                            ct,
+                            ca,
+                            move,
+                            policy,
+                        )
+                        if ce:
+                            logger.warning("附属文件处理失败 %s: %s", companion, ce)
+                        else:
+                            companions_processed += 1
+
                 if err is not None:
                     failed += 1
                     await task_manager.send_log(
@@ -340,6 +441,16 @@ async def run_organize_task(
                     task.current_file = file_path
                     db.commit()
 
+        # 清理空目录（仅 move 模式，copy 保留原文件不产生空目录）
+        dirs_cleaned = 0
+        if move and moved > 0:
+            dirs_cleaned = _cleanup_empty_dirs(input_dir)
+            if dirs_cleaned > 0:
+                await task_manager.send_log(
+                    task_id, "info", f"清理空目录 {dirs_cleaned} 个"
+                )
+                logger.info("清理空目录 %d 个", dirs_cleaned)
+
         # 任务完成
         result = {
             "mode": mode,
@@ -348,6 +459,7 @@ async def run_organize_task(
             "skipped": skipped,
             "failed": failed,
             "total": total,
+            "dirsCleaned": dirs_cleaned,
         }
         if task is not None:
             task.status = "completed"
@@ -359,10 +471,10 @@ async def run_organize_task(
             db.commit()
         await task_manager.send_log(
             task_id, "info",
-            f"{action_desc}完成：移动 {moved}，复制 {copied}，跳过 {skipped}，失败 {failed}",
+            f"{action_desc}完成：移动 {moved}，复制 {copied}，跳过 {skipped}，失败 {failed}，清理空目录 {dirs_cleaned}",
         )
-        logger.info("%s任务完成: 移动=%d 复制=%d 跳过=%d 失败=%d",
-                    action_desc, moved, copied, skipped, failed)
+        logger.info("%s任务完成: 移动=%d 复制=%d 跳过=%d 失败=%d 清理空目录=%d",
+                    action_desc, moved, copied, skipped, failed, dirs_cleaned)
         return result
     except Exception as exc:  # noqa: BLE001
         logger.exception("%s任务异常: %s", action_desc, task_id)

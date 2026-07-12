@@ -277,8 +277,13 @@ def get_groups_with_files(
     Returns:
         (groups, total)
     """
-    # 按 group_hash 聚合
-    all_groups = db.query(DuplicateGroup).order_by(DuplicateGroup.detected_at.desc()).all()
+    # 按 group_hash 聚合（仅返回未处理的组）
+    all_groups = (
+        db.query(DuplicateGroup)
+        .filter(DuplicateGroup.status == "pending")
+        .order_by(DuplicateGroup.detected_at.desc())
+        .all()
+    )
     groups_map: Dict[str, List[DuplicateGroup]] = defaultdict(list)
     for g in all_groups:
         groups_map[g.group_hash].append(g)
@@ -295,16 +300,20 @@ def get_groups_with_files(
         song_ids = [m.song_id for m in members]
         songs = db.query(Song).filter(Song.id.in_(song_ids)).all() if song_ids else []
         keep_id = _recommend_keep(songs)
+        artist_name = _get_artist_name(db, songs[0]) if songs else "Unknown"
         files = []
         for song in songs:
             files.append({
                 "song_id": song.id,
                 "file_path": song.file_path,
                 "title": song.title,
+                "artist": artist_name,
                 "bitrate": song.bitrate,
                 "file_size": song.file_size,
                 "duration": song.duration,
                 "format": song.format,
+                "sample_rate": song.sample_rate,
+                "file_modified": song.file_modified,
                 "recommended": song.id == keep_id,
             })
         first = members[0]

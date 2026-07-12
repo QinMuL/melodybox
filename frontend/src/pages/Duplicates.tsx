@@ -17,30 +17,79 @@ import {
   formatRelativeTime,
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { DuplicateGroup } from "@/types";
+import type { DuplicateGroup, OrganizeTask } from "@/types";
 
 export default function Duplicates() {
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [scanTask, setScanTask] = useState<OrganizeTask | null>(null);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
-    const res = await api.duplicates.groups(1, 50);
-    setGroups(res.items);
-    setLoading(false);
+    try {
+      const res = await api.duplicates.groups(1, 50);
+      setGroups(res.items);
+    } catch {
+      // ignore load errors
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadData();
   }, []);
 
+  // 轮询扫描任务状态
+  useEffect(() => {
+    if (!scanTask) return;
+    if (scanTask.status === "completed" || scanTask.status === "failed") {
+      setScanning(false);
+      if (scanTask.status === "failed") {
+        setError("扫描失败：" + (scanTask.result?.error || "未知错误"));
+      } else {
+        loadData();
+      }
+      return;
+    }
+    const taskId = scanTask.id;
+    const timer = setInterval(async () => {
+      try {
+        const t = await api.organize.task(taskId);
+        setScanTask(t);
+        if (t.status === "completed" || t.status === "failed") {
+          clearInterval(timer);
+          setScanning(false);
+          if (t.status === "failed") {
+            setError("扫描失败：" + (t.result?.error || "未知错误"));
+          } else {
+            loadData();
+          }
+        }
+      } catch {
+        clearInterval(timer);
+        setScanning(false);
+        setError("扫描任务查询失败");
+      }
+    }, 1500);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanTask?.id]);
+
   const handleScan = async () => {
     setScanning(true);
-    await api.duplicates.scan();
-    setTimeout(loadData, 1500);
-    setScanning(false);
+    setError(null);
+    try {
+      const { taskId } = await api.duplicates.scan();
+      const t = await api.organize.task(taskId);
+      setScanTask(t);
+    } catch {
+      setScanning(false);
+      setError("启动扫描失败");
+    }
   };
 
   const handleResolve = async (
@@ -49,9 +98,20 @@ export default function Duplicates() {
     action: "recycle" | "delete"
   ) => {
     setResolvingId(group.id);
-    await api.duplicates.resolve(group.id, keepFileId, action);
-    setGroups((prev) => prev.filter((g) => g.id !== group.id));
-    setResolvingId(null);
+    setError(null);
+    try {
+      await api.duplicates.resolve(group.groupHash, keepFileId, action);
+      setGroups((prev) => prev.filter((g) => g.id !== group.id));
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data
+              ?.detail || "处理失败"
+          : "处理失败";
+      setError(msg);
+    } finally {
+      setResolvingId(null);
+    }
   };
 
   return (
@@ -82,6 +142,42 @@ export default function Duplicates() {
           {scanning ? "扫描中..." : "扫描重复"}
         </button>
       </div>
+
+      {/* 扫描进度 */}
+      {scanning && scanTask && (
+        <div className="card flex items-center gap-3 p-4">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-ink-primary dark:text-ink-light">
+              正在扫描重复文件...
+            </p>
+            {scanTask.totalFiles > 0 && (
+              <p className="text-xs text-ink-muted dark:text-ink-lightMuted">
+                {scanTask.processedFiles} / {scanTask.totalFiles}
+                （{scanTask.progress.toFixed(0)}%）
+              </p>
+            )}
+            {scanTask.currentFile && (
+              <p className="mt-0.5 truncate font-mono text-[10px] text-ink-muted dark:text-ink-lightMuted">
+                {scanTask.currentFile}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 错误提示 */}
+      {error && (
+        <div className="card flex items-center gap-2 border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-900/10">
+          <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
+          <button
+            onClick={() => setError(null)}
+            className="ml-auto text-xs text-red-500 hover:underline"
+          >
+            关闭
+          </button>
+        </div>
+      )}
 
       {/* 重复组列表 */}
       {loading ? (
@@ -133,7 +229,7 @@ function DuplicateGroupCard({
   ) => void;
 }) {
   const [selectedId, setSelectedId] = useState<string>(
-    group.files.find((f) => f.recommended)?.id || group.files[0].id
+    group.files.find((f) => f.recommended)?.songId || group.files[0].songId
   );
 
   return (
@@ -167,10 +263,10 @@ function DuplicateGroupCard({
       {/* 文件对比 */}
       <div className="divide-y divide-surface-border dark:divide-dark-border/50">
         {group.files.map((file) => {
-          const isSelected = selectedId === file.id;
+          const isSelected = selectedId === file.songId;
           return (
             <div
-              key={file.id}
+              key={file.songId}
               className={cn(
                 "flex items-center gap-4 px-5 py-3 transition-colors",
                 isSelected
@@ -179,7 +275,7 @@ function DuplicateGroupCard({
               )}
             >
               <button
-                onClick={() => setSelectedId(file.id)}
+                onClick={() => setSelectedId(file.songId)}
                 className={cn(
                   "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
                   isSelected
@@ -235,7 +331,7 @@ function DuplicateGroupCard({
                 <div className="hidden text-center lg:block">
                   <p className="text-ink-muted dark:text-ink-lightMuted">修改时间</p>
                   <p className="font-mono font-semibold text-ink-secondary dark:text-ink-lightSecondary">
-                    {formatRelativeTime(file.modifiedAt)}
+                    {formatRelativeTime(file.fileModified)}
                   </p>
                 </div>
               </div>

@@ -206,7 +206,10 @@ export const api = {
       ),
     resolve: (groupId: string, keepFileId: string, action: "recycle" | "delete") =>
       client
-        .post(`/duplicates/groups/${groupId}/resolve`, { keepFileId, action })
+        .post(`/duplicates/groups/${encodeURIComponent(groupId)}/resolve`, {
+          keepFileId,
+          action,
+        })
         .then((r) => r.data),
   },
 

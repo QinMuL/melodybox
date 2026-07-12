@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -380,14 +380,9 @@ def get_artist_avatar(artist_id: str, db: Session = Depends(get_db)):
         media_type = "image/png" if avatar.suffix.lower() == ".png" else "image/jpeg"
         return FileResponse(str(avatar), media_type=media_type)
 
-    # 回退：生成首字母 SVG（透明背景，让前端父容器背景色透过显示）
-    name = artist.name or "U"
-    initial = name[0].upper() if name else "U"
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
-  <rect width="200" height="200" fill="transparent"/>
-  <text x="100" y="100" font-size="100" font-family="sans-serif" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central" font-weight="bold">{initial}</text>
-</svg>'''
-    return Response(content=svg, media_type="image/svg+xml")
+    # 无真实头像时返回 404，前端 ImageWithFallback 会渲染首字母 fallback，
+    # 继承父容器 bg-primary-gradient 的主题色（亮色绿/暗色红）
+    raise HTTPException(status_code=404, detail="无头像")
 
 
 @router.post("/artists/{artist_id}/fetch-avatar")

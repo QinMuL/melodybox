@@ -53,6 +53,11 @@ export interface OrganizeConfig {
   excludePatterns: string[];
 }
 
+export interface CompanionFile {
+  oldPath: string;
+  newPath: string;
+}
+
 export interface PreviewChange {
   oldPath: string;
   newPath: string;
@@ -62,6 +67,7 @@ export interface PreviewChange {
   album?: string;
   title?: string;
   trackNumber?: number;
+  companions?: CompanionFile[];
 }
 
 export interface PreviewResult {
@@ -94,7 +100,7 @@ export interface OrganizeTask {
 }
 
 export interface DuplicateFile {
-  id: string;
+  songId: string;
   filePath: string;
   title: string;
   artist: string;
@@ -102,13 +108,16 @@ export interface DuplicateFile {
   bitrate: number;
   sampleRate: number;
   fileSize: number;
-  modifiedAt: string;
+  fileModified: string;
   recommended: boolean;
 }
 
 export interface DuplicateGroup {
   id: string;
+  groupHash: string;
   similarity: number;
+  status: string;
+  detectedAt: string;
   files: DuplicateFile[];
 }
 

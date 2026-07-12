@@ -33,8 +33,12 @@ export default function Logs() {
   const [level, setLevel] = useState<string>("");
   const [search, setSearch] = useState("");
   const [limit, setLimit] = useState(500);
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [followTail, setFollowTail] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(
+    () => localStorage.getItem("logs:autoRefresh") === "true"
+  );
+  const [followTail, setFollowTail] = useState(
+    () => localStorage.getItem("logs:followTail") !== "false"
+  );
   const [clearing, setClearing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,6 +90,14 @@ export default function Logs() {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [data, followTail]);
+
+  // 持久化 UI 偏好到 localStorage
+  useEffect(() => {
+    localStorage.setItem("logs:followTail", String(followTail));
+  }, [followTail]);
+  useEffect(() => {
+    localStorage.setItem("logs:autoRefresh", String(autoRefresh));
+  }, [autoRefresh]);
 
   const handleClear = async () => {
     if (!confirm("确认清空当前主日志文件？轮转副本会保留。")) return;

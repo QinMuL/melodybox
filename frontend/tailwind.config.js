@@ -67,8 +67,8 @@ export default {
       boxShadow: {
         card: "0 2px 12px rgba(0, 0, 0, 0.06)",
         cardHover: "0 8px 24px rgba(0, 0, 0, 0.1)",
-        primary: "0 4px 16px rgba(49, 194, 124, 0.3)",
-        glow: "0 0 20px rgba(49, 194, 124, 0.4)",
+        primary: "0 4px 16px rgb(var(--color-primary) / 0.3)",
+        glow: "0 0 20px rgb(var(--color-primary) / 0.4)",
       },
       backgroundImage: {
         // 主色渐变：通过 CSS 变量自动适配亮色绿/暗色红

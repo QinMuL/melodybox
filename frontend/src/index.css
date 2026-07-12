@@ -18,20 +18,20 @@
   --color-primary-900: 22 133 102;
 }
 
-/* 暗色模式：网易云风格红色主色（降低饱和度避免刺眼，使用 tailwind red-700 #B91C1C） */
+/* 暗色模式：网易云风格红色主色（大幅降低饱和度，使用 #8B2C2C 暖红/赤陶色） */
 .dark {
-  /* 红色主色 #B91C1C 系列（稳重不刺眼） */
-  --color-primary: 185 28 28;
-  --color-primary-50: 254 242 242;
-  --color-primary-100: 254 226 226;
-  --color-primary-200: 254 202 202;
-  --color-primary-300: 252 165 165;
-  --color-primary-400: 220 38 38;
-  --color-primary-500: 185 28 28;
-  --color-primary-600: 153 27 27;
-  --color-primary-700: 127 29 29;
-  --color-primary-800: 100 22 22;
-  --color-primary-900: 70 15 15;
+  /* #8B2C2C 系列：饱和度约 52%，比 #B91C1C 的 65% 明显柔和 */
+  --color-primary: 139 44 44;
+  --color-primary-50: 245 235 235;
+  --color-primary-100: 230 215 215;
+  --color-primary-200: 210 185 185;
+  --color-primary-300: 180 120 120;
+  --color-primary-400: 160 70 70;
+  --color-primary-500: 139 44 44;
+  --color-primary-600: 115 36 36;
+  --color-primary-700: 96 30 30;
+  --color-primary-800: 76 24 24;
+  --color-primary-900: 56 18 18;
 }
 
 :root {

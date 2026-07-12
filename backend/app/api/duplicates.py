@@ -85,7 +85,7 @@ def resolve_group(
     recycle_dir = config.get("recycleDir", "/music/.recycle")
 
     result = duplicate_service.resolve_group(
-        db, group_id, req.keepFileId, req.action, recycle_dir
+        db, group_id, req.keep_file_id, req.action, recycle_dir
     )
     if result.get("error"):
         raise HTTPException(status_code=404, detail=result["error"])

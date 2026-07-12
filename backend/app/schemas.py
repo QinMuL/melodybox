@@ -165,6 +165,13 @@ class PreviewRequest(CamelModel):
     exclude_patterns: Optional[List[str]] = None
 
 
+class CompanionFile(CamelModel):
+    """附属文件（如 -mediainfo.json）。"""
+
+    old_path: str
+    new_path: str
+
+
 class PreviewItem(CamelModel):
     """单个文件预览结果。"""
 
@@ -176,6 +183,7 @@ class PreviewItem(CamelModel):
     album: Optional[str] = None
     title: Optional[str] = None
     track_number: Optional[int] = None
+    companions: List[CompanionFile] = []
 
 
 class PreviewResponse(CamelModel):
@@ -228,10 +236,13 @@ class DuplicateGroupItem(CamelModel):
     song_id: str
     file_path: str
     title: str
+    artist: str = "Unknown"
     bitrate: Optional[int] = None
     file_size: Optional[int] = None
     duration: Optional[float] = None
     format: Optional[str] = None
+    sample_rate: Optional[int] = None
+    file_modified: Optional[datetime] = None
     recommended: bool = False  # 是否推荐保留
 
 
