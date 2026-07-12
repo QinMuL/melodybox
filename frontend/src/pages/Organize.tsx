@@ -7,6 +7,7 @@ import {
   Play,
   CheckCircle2,
   ArrowRight,
+  ArrowDown,
   Filter,
   FileMusic,
   SkipForward,
@@ -209,7 +210,7 @@ function OperationCard({ mode }: { mode: Mode }) {
           </div>
 
           {/* 列表 */}
-          <div className="max-h-[420px] space-y-1.5 overflow-y-auto rounded-lg bg-surface-light p-2 dark:bg-dark-hover/50">
+          <div className="max-h-[560px] space-y-2 overflow-y-auto rounded-lg bg-surface-light p-2 dark:bg-dark-hover/50">
             {filteredChanges.length === 0 ? (
               <div className="py-8 text-center text-sm text-ink-muted dark:text-ink-lightMuted">
                 无符合条件的项
@@ -333,7 +334,7 @@ function StatCard({
   );
 }
 
-/** 单条预览项 */
+/** 单条预览项 — 上下显示原路径与新路径，差异化背景便于观察 */
 function PreviewRow({ index, item }: { index: number; item: PreviewChange }) {
   const oldP = splitPath(item.oldPath);
   const newP = splitPath(item.newPath);
@@ -344,11 +345,12 @@ function PreviewRow({ index, item }: { index: number; item: PreviewChange }) {
     skip: { label: "跳过", icon: <SkipForward className="h-3 w-3" />, color: "bg-gray-100 text-gray-600 dark:bg-gray-700/40 dark:text-gray-300" },
   };
   const cfg = actionConfig[item.action] || actionConfig.skip;
+  const isSkip = item.action === "skip";
 
   return (
-    <div className="rounded-md border border-transparent bg-surface-card px-3 py-2 transition-colors hover:border-surface-border hover:bg-surface-hover dark:bg-dark-card dark:hover:border-dark-border dark:hover:bg-dark-hover">
-      {/* 第一行：序号 + 操作徽章 + 元数据 */}
-      <div className="flex items-center gap-2">
+    <div className="rounded-md border border-surface-border bg-surface-card transition-colors hover:border-primary/40 dark:border-dark-border dark:bg-dark-card dark:hover:border-primary/40">
+      {/* 第一行：序号 + 操作徽章 + 元数据 + 跳过原因 */}
+      <div className="flex items-center gap-2 px-3 py-2">
         <span className="w-6 shrink-0 text-right font-mono text-[10px] text-ink-muted dark:text-ink-lightMuted">
           {String(index).padStart(2, "0")}
         </span>
@@ -357,36 +359,60 @@ function PreviewRow({ index, item }: { index: number; item: PreviewChange }) {
           {cfg.label}
         </span>
         {(item.artist || item.album || item.title) && (
-          <span className="truncate text-xs text-ink-muted dark:text-ink-lightMuted">
-            {item.artist && <span>{item.artist}</span>}
-            {item.album && <span> · {item.album}</span>}
-            {item.title && <span> · {item.title}</span>}
+          <span className="min-w-0 flex-1 truncate text-xs text-ink-secondary dark:text-ink-lightSecondary">
+            {item.artist && <span className="font-medium">{item.artist}</span>}
+            {item.album && <span className="text-ink-muted dark:text-ink-lightMuted"> · {item.album}</span>}
+            {item.title && <span className="text-ink-muted dark:text-ink-lightMuted"> · {item.title}</span>}
           </span>
         )}
         {item.reason && (
-          <span className="ml-auto truncate text-[10px] italic text-ink-muted dark:text-ink-lightMuted">
+          <span className="ml-auto shrink-0 truncate text-[10px] italic text-ink-muted dark:text-ink-lightMuted">
             {item.reason}
           </span>
         )}
       </div>
-      {/* 第二行：原路径 → 新路径 */}
-      <div className="mt-1.5 flex items-start gap-2 pl-8">
-        <div className="min-w-0 flex-1 truncate font-mono text-[11px]">
-          <span className="text-ink-muted dark:text-ink-lightMuted">{oldP.dir}</span>
-          <span className="text-ink-secondary dark:text-ink-lightSecondary">{oldP.file}</span>
+      {/* 路径区：上下两块，差异化背景 */}
+      <div className="px-3 pb-3">
+        {/* 原路径（上方）：浅灰背景 */}
+        <div className="flex items-start gap-2 rounded-t-md bg-surface-light px-3 py-2 dark:bg-dark-hover">
+          <span className="mt-0.5 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-ink-muted dark:text-ink-lightMuted">
+            原
+          </span>
+          <div className="min-w-0 flex-1 break-all font-mono text-[11px]">
+            <span className="text-ink-muted dark:text-ink-lightMuted">{oldP.dir}</span>
+            <span className="text-ink-secondary dark:text-ink-lightSecondary">{oldP.file}</span>
+          </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <ArrowRight className="h-3 w-3 text-primary" />
+        {/* 中间垂直箭头：圆形主色背景 */}
+        <div className="flex justify-center">
+          <div className="-my-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface-card bg-primary text-white shadow-sm dark:border-dark-card">
+            <ArrowDown className="h-3 w-3" />
+          </div>
         </div>
-        <div className="min-w-0 flex-1 truncate font-mono text-[11px]">
-          {item.action === "skip" ? (
-            <span className="text-ink-muted dark:text-ink-lightMuted italic">{newP.file}</span>
-          ) : (
-            <>
-              <span className="text-ink-muted dark:text-ink-lightMuted">{newP.dir}</span>
-              <span className="font-medium text-primary">{newP.file}</span>
-            </>
+        {/* 新路径（下方）：主色淡背景 */}
+        <div
+          className={cn(
+            "flex items-start gap-2 rounded-b-md px-3 py-2",
+            isSkip
+              ? "bg-surface-light dark:bg-dark-hover"
+              : "bg-primary/5 dark:bg-primary/10"
           )}
+        >
+          <span className="mt-0.5 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-primary">
+            新
+          </span>
+          <div className="min-w-0 flex-1 break-all font-mono text-[11px]">
+            {isSkip ? (
+              <span className="italic text-ink-muted dark:text-ink-lightMuted">
+                {newP.dir}<span>{newP.file}</span>
+              </span>
+            ) : (
+              <>
+                <span className="text-ink-muted dark:text-ink-lightMuted">{newP.dir}</span>
+                <span className="font-semibold text-primary">{newP.file}</span>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

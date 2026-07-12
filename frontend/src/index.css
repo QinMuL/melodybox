@@ -2,6 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 主色调 CSS 变量：亮色用绿色（QQ 音乐），暗色用红色（网易云） */
+:root {
+  /* 绿色主色 #31C27C 系列（QQ 音乐风格） */
+  --color-primary: 49 194 124;
+  --color-primary-50: 232 250 240;
+  --color-primary-100: 209 244 225;
+  --color-primary-200: 163 233 196;
+  --color-primary-300: 117 221 166;
+  --color-primary-400: 71 210 136;
+  --color-primary-500: 49 194 124;
+  --color-primary-600: 39 168 100;
+  --color-primary-700: 31 209 161;
+  --color-primary-800: 27 168 128;
+  --color-primary-900: 22 133 102;
+}
+
+/* 暗色模式：网易云风格红色主色 #C20C0C */
+.dark {
+  /* 红色主色 #C20C0C 系列（网易云音乐风格） */
+  --color-primary: 194 12 12;
+  --color-primary-50: 252 233 233;
+  --color-primary-100: 250 220 220;
+  --color-primary-200: 245 188 188;
+  --color-primary-300: 240 155 155;
+  --color-primary-400: 232 70 70;
+  --color-primary-500: 194 12 12;
+  --color-primary-600: 168 10 10;
+  --color-primary-700: 142 8 8;
+  --color-primary-800: 116 7 7;
+  --color-primary-900: 90 5 5;
+}
+
 :root {
   font-family: "PingFang SC", "HarmonyOS Sans", "Microsoft YaHei",
     -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

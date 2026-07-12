@@ -9,19 +9,20 @@ export default {
     },
     extend: {
       colors: {
-        // QQ 音乐主色调（亮色模式）
+        // 主色：亮色用绿色（QQ 音乐），暗色用红色（网易云）
+        // 通过 CSS 变量切换，支持透明度修饰符（如 primary/10）
         primary: {
-          DEFAULT: "#31C27C",
-          50: "#E8FAF0",
-          100: "#D1F4E1",
-          200: "#A3E9C4",
-          300: "#75DDA6",
-          400: "#47D288",
-          500: "#31C27C",
-          600: "#27A864",
-          700: "#1FD1A1",
-          800: "#1BA880",
-          900: "#168566",
+          DEFAULT: "rgb(var(--color-primary) / <alpha-value>)",
+          50: "rgb(var(--color-primary-50) / <alpha-value>)",
+          100: "rgb(var(--color-primary-100) / <alpha-value>)",
+          200: "rgb(var(--color-primary-200) / <alpha-value>)",
+          300: "rgb(var(--color-primary-300) / <alpha-value>)",
+          400: "rgb(var(--color-primary-400) / <alpha-value>)",
+          500: "rgb(var(--color-primary-500) / <alpha-value>)",
+          600: "rgb(var(--color-primary-600) / <alpha-value>)",
+          700: "rgb(var(--color-primary-700) / <alpha-value>)",
+          800: "rgb(var(--color-primary-800) / <alpha-value>)",
+          900: "rgb(var(--color-primary-900) / <alpha-value>)",
         },
         // 浅色主题
         surface: {
@@ -70,9 +71,10 @@ export default {
         glow: "0 0 20px rgba(49, 194, 124, 0.4)",
       },
       backgroundImage: {
-        "primary-gradient": "linear-gradient(135deg, #31C27C 0%, #1FD1A1 100%)",
+        // 主色渐变：通过 CSS 变量自动适配亮色绿/暗色红
+        "primary-gradient": "linear-gradient(135deg, rgb(var(--color-primary-400)) 0%, rgb(var(--color-primary-600)) 100%)",
         "primary-gradient-hover":
-          "linear-gradient(135deg, #27A864 0%, #1BA880 100%)",
+          "linear-gradient(135deg, rgb(var(--color-primary-500)) 0%, rgb(var(--color-primary-700)) 100%)",
       },
       animation: {
         "fade-in": "fadeIn 0.3s ease-out",
