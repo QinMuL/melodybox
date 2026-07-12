@@ -18,7 +18,7 @@ from typing import Any, Dict, List
 
 from sqlalchemy.orm import Session
 
-from app.models import OrganizeTask, TaskLog
+from app.models import Album, Artist, OrganizeTask, Song, TaskLog
 from app.schemas import CompanionFile, PreviewItem
 from app.services import metadata_service
 from app.services.task_manager import (
@@ -43,6 +43,34 @@ ORGANIZE_TEMPLATE = "{artist}/{album}/{filename}"
 
 # 音频文件的附属文件后缀（移动/重命名时一并处理）
 COMPANION_SUFFIXES = ["-mediainfo.json"]
+
+
+def _load_metadata_cache(db: Session) -> Dict[str, Dict[str, Any]]:
+    """从数据库加载所有歌曲的元数据，返回 {file_path: metadata_dict}。
+
+    避免每次整理/预览都重新读取音频文件元数据（FLAC 解析很慢）。
+    """
+    cache: Dict[str, Dict[str, Any]] = {}
+    rows = (
+        db.query(Song, Album, Artist)
+        .join(Album, Song.album_id == Album.id)
+        .join(Artist, Album.artist_id == Artist.id)
+        .all()
+    )
+    for song, album, artist in rows:
+        cache[song.file_path] = {
+            "title": song.title,
+            "artist": artist.name if artist else "Unknown",
+            "album": album.title if album else "Unknown",
+            "track_number": song.track_number,
+            "year": album.year if album else None,
+            "duration": song.duration or 0.0,
+            "format": song.format,
+            "bitrate": song.bitrate,
+            "sample_rate": song.sample_rate,
+            "channels": song.channels,
+        }
+    return cache
 
 
 def _build_render_data(metadata: Dict[str, Any], file_path: str) -> Dict[str, Any]:
@@ -203,8 +231,11 @@ def preview(
     move: bool = False,
     policy: str = "skip",
     exclude_patterns: List[str] | None = None,
+    db: Session | None = None,
 ) -> List[PreviewItem]:
     """预览整理结果（dry-run，不实际操作文件）。
+
+    优先使用数据库已索引的元数据（快），仅在文件未入库时回退到磁盘读取（慢）。
 
     Args:
         input_dir: 输入目录
@@ -214,6 +245,7 @@ def preview(
         move: True=移动，False=复制
         policy: 冲突策略 skip/overwrite/rename
         exclude_patterns: 排除模式列表
+        db: 数据库会话（提供则使用已索引元数据加速）
 
     Returns:
         PreviewItem 列表
@@ -221,8 +253,18 @@ def preview(
     items: List[PreviewItem] = []
     files = find_audio_files(input_dir, exclude_patterns)
 
+    # 从数据库加载元数据缓存，避免逐个读取音频文件
+    meta_cache: Dict[str, Dict[str, Any]] = {}
+    if db is not None:
+        meta_cache = _load_metadata_cache(db)
+        logger.info("预览：数据库缓存 %d 条元数据，磁盘文件 %d 个", len(meta_cache), len(files))
+
+    disk_reads = 0
     for file_path in files:
-        metadata = metadata_service.read_metadata(file_path)
+        metadata = meta_cache.get(file_path)
+        if metadata is None:
+            metadata = metadata_service.read_metadata(file_path)
+            disk_reads += 1
         data = _build_render_data(metadata, file_path)
         target = _compute_target(
             file_path, metadata, mode, output_dir, naming_template
@@ -251,6 +293,8 @@ def preview(
                 companions=companions,
             )
         )
+    if disk_reads > 0:
+        logger.info("预览：从磁盘读取了 %d 个未入库文件的元数据", disk_reads)
     return items
 
 
@@ -355,13 +399,24 @@ async def run_organize_task(
             task_id, "info", f"开始{action_desc}任务，共 {total} 个文件"
         )
 
+        # 从数据库加载元数据缓存，避免逐个读取音频文件（FLAC 解析很慢）
+        meta_cache = _load_metadata_cache(db)
+        logger.info(
+            "整理任务：数据库缓存 %d 条元数据，磁盘文件 %d 个",
+            len(meta_cache), total,
+        )
+        disk_reads = 0
+
         loop = asyncio.get_event_loop()
         with ThreadPoolExecutor(max_workers=4) as executor:
             for idx, file_path in enumerate(files, start=1):
-                # 读取元数据
-                metadata = await loop.run_in_executor(
-                    executor, metadata_service.read_metadata, file_path
-                )
+                # 优先使用数据库缓存，未入库时回退到磁盘读取
+                metadata = meta_cache.get(file_path)
+                if metadata is None:
+                    metadata = await loop.run_in_executor(
+                        executor, metadata_service.read_metadata, file_path
+                    )
+                    disk_reads += 1
                 # 计算目标路径
                 target = _compute_target(
                     file_path, metadata, mode, output_dir, naming_template
@@ -440,6 +495,11 @@ async def run_organize_task(
                     task.progress = progress
                     task.current_file = file_path
                     db.commit()
+
+        if disk_reads > 0:
+            logger.info(
+                "整理任务：从磁盘读取了 %d 个未入库文件的元数据", disk_reads
+            )
 
         # 清理空目录（仅 move 模式，copy 保留原文件不产生空目录）
         dirs_cleaned = 0

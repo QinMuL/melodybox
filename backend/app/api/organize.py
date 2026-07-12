@@ -65,6 +65,7 @@ def preview(req: PreviewRequest, db: Session = Depends(get_db)) -> PreviewRespon
         move=move,
         policy=policy,
         exclude_patterns=exclude_patterns,
+        db=db,
     )
     skipped = sum(1 for i in items if i.action == "skip")
     return PreviewResponse(changes=items, total_changes=len(items), skipped=skipped)
