@@ -83,14 +83,37 @@ export const api = {
       ),
     search: (q: string) =>
       withFallback(
-        () =>
-          client
-            .get<{ songs: Song[]; artists: Artist[]; albums: Album[] }>(
-              "/library/search",
-              { params: { q } }
-            )
-            .then((r) => r.data),
-        { songs: [], artists: [], albums: [] }
+        async () => {
+          const res = await client.get<{
+            items: Array<{ type: string; id: string; name: string; detail?: string }>;
+            total: number;
+          }>("/library/search", { params: { q } });
+          const items = res.data.items;
+          // 后端返回扁平 items，前端按 type 分组并补默认字段
+          const artists = items
+            .filter((i) => i.type === "artist")
+            .map((i) => ({
+              id: i.id,
+              name: i.name,
+              albumCount: 0,
+              songCount: 0,
+            } as unknown as Artist));
+          const albums = items
+            .filter((i) => i.type === "album")
+            .map((i) => ({
+              id: i.id,
+              title: i.name,
+              songCount: 0,
+            } as unknown as Album));
+          const songs = items
+            .filter((i) => i.type === "song")
+            .map((i) => ({
+              id: i.id,
+              title: i.name,
+            } as unknown as Song));
+          return { artists, albums, songs };
+        },
+        { songs: [] as Song[], artists: [] as Artist[], albums: [] as Album[] }
       ),
     scan: (directory?: string) =>
       withFallback(
