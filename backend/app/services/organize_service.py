@@ -18,7 +18,7 @@ from typing import Any, Dict, List
 
 from sqlalchemy.orm import Session
 
-from app.models import Album, Artist, OrganizeTask, Song, TaskLog
+from app.models import Album, Artist, OrganizeTask, Song, SongArtist, TaskLog
 from app.schemas import CompanionFile, PreviewItem
 from app.services import metadata_service
 from app.services.task_manager import (
@@ -49,18 +49,40 @@ def _load_metadata_cache(db: Session) -> Dict[str, Dict[str, Any]]:
     """从数据库加载所有歌曲的元数据，返回 {file_path: metadata_dict}。
 
     避免每次整理/预览都重新读取音频文件元数据（FLAC 解析很慢）。
+    多艺人歌曲通过 SongArtist 关联表查询所有艺人，用 ' & ' 拼接。
     """
     cache: Dict[str, Dict[str, Any]] = {}
     rows = (
-        db.query(Song, Album, Artist)
+        db.query(Song, Album)
         .join(Album, Song.album_id == Album.id)
-        .join(Artist, Album.artist_id == Artist.id)
         .all()
     )
-    for song, album, artist in rows:
+    # 预加载每首歌的所有艺人（按 primary 优先、created_at 排序）
+    song_ids = [song.id for song, _ in rows]
+    artist_map: Dict[str, List[str]] = {}
+    if song_ids:
+        sa_rows = (
+            db.query(SongArtist, Artist)
+            .join(Artist, SongArtist.artist_id == Artist.id)
+            .filter(SongArtist.song_id.in_(song_ids))
+            .order_by(
+                # primary 艺人排前，featured 排后；同 role 内按创建顺序
+                SongArtist.role.desc(),
+                SongArtist.created_at.asc(),
+            )
+            .all()
+        )
+        for sa, artist in sa_rows:
+            artist_map.setdefault(sa.song_id, []).append(
+                artist.name if artist else "Unknown"
+            )
+
+    for song, album in rows:
+        artists = artist_map.get(song.id) or []
+        artist_name = " & ".join(artists) if artists else "Unknown"
         cache[song.file_path] = {
             "title": song.title,
-            "artist": artist.name if artist else "Unknown",
+            "artist": artist_name,
             "album": album.title if album else "Unknown",
             "track_number": song.track_number,
             "year": album.year if album else None,
