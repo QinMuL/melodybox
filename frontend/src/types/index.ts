@@ -56,8 +56,12 @@ export interface OrganizeConfig {
 export interface PreviewChange {
   oldPath: string;
   newPath: string;
-  action: "rename" | "move" | "skip";
+  action: "rename" | "move" | "copy" | "skip";
   reason: string;
+  artist?: string;
+  album?: string;
+  title?: string;
+  trackNumber?: number;
 }
 
 export interface PreviewResult {

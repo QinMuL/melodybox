@@ -9,7 +9,7 @@ export default {
     },
     extend: {
       colors: {
-        // QQ 音乐主色调
+        // QQ 音乐主色调（亮色模式）
         primary: {
           DEFAULT: "#31C27C",
           50: "#E8FAF0",
@@ -30,21 +30,22 @@ export default {
           hover: "#F0F0F2",
           border: "#E5E5E7",
         },
-        // 深色主题
+        // 深色主题（仿网易云音乐：背景柔和深灰，避免纯黑刺眼）
         dark: {
-          DEFAULT: "#1A1A1A",
-          card: "#2A2A2A",
-          hover: "#333333",
-          border: "#3A3A3A",
+          DEFAULT: "#1F1F1F",   // 主背景（网易云主色）
+          card: "#2C2C2C",      // 卡片背景
+          hover: "#333333",     // 悬停色
+          border: "#383838",    // 边框
+          light: "#383838",     // 浅一档（用于阴影边缘）
         },
         // 文字
         ink: {
-          primary: "#333333",
+          primary: "#333333",       // 浅色主文字
           secondary: "#666666",
           muted: "#999999",
-          light: "#FFFFFF",
-          lightSecondary: "#CCCCCC",
-          lightMuted: "#888888",
+          light: "#E5E5E5",         // 暗色主文字（避免纯白刺眼，仿网易云）
+          lightSecondary: "#A0A0A0",
+          lightMuted: "#707070",
         },
       },
       fontFamily: {

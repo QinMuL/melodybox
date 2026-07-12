@@ -23,6 +23,23 @@ body {
   min-height: 100vh;
 }
 
+/* 暗色模式背景：仿网易云的柔和深灰，加微妙顶部高光 */
+.dark body,
+.dark #root {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(56, 56, 56, 0.6) 0%, transparent 60%),
+    #1F1F1F;
+  min-height: 100vh;
+}
+
+/* 亮色模式背景也加微妙渐变 */
+#root {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(49, 194, 124, 0.04) 0%, transparent 60%),
+    #F5F5F7;
+  min-height: 100vh;
+}
+
 /* 自定义滚动条 - 仿 QQ 音乐风格 */
 ::-webkit-scrollbar {
   width: 8px;
@@ -42,12 +59,13 @@ body {
   background: rgba(153, 153, 153, 0.5);
 }
 
+/* 暗色模式滚动条 - 仿网易云 */
 .dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 @layer components {
@@ -61,9 +79,9 @@ body {
     @apply inline-flex items-center justify-center gap-2 rounded-pill border border-surface-border bg-surface-card px-5 py-2.5 text-sm font-medium text-ink-secondary transition-all duration-200 hover:border-primary hover:text-primary active:scale-95 dark:border-dark-border dark:bg-dark-card dark:text-ink-lightSecondary dark:hover:border-primary dark:hover:text-primary;
   }
 
-  /* 卡片容器 */
+  /* 卡片容器 - 暗色模式加微妙边框和内高光 */
   .card {
-    @apply rounded-xl bg-surface-card shadow-card transition-all duration-200 dark:bg-dark-card;
+    @apply rounded-xl bg-surface-card shadow-card transition-all duration-200 dark:bg-dark-card dark:border dark:border-dark-border/60;
   }
 
   /* 输入框 */
