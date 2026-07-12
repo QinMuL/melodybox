@@ -55,7 +55,12 @@ function OperationCard({ mode }: { mode: Mode }) {
 
   // 执行任务后轮询状态
   useEffect(() => {
-    if (!task || task.status === "completed" || task.status === "failed") return;
+    if (!task) return;
+    // 任务已结束：确保 executing 关闭
+    if (task.status === "completed" || task.status === "failed") {
+      setExecuting(false);
+      return;
+    }
     const timer = setInterval(async () => {
       const t = await api.organize.task(task.id);
       setTask(t);

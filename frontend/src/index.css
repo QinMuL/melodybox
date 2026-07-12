@@ -18,20 +18,20 @@
   --color-primary-900: 22 133 102;
 }
 
-/* 暗色模式：网易云风格红色主色 #C20C0C */
+/* 暗色模式：网易云风格红色主色（降低饱和度避免刺眼，使用 tailwind red-700 #B91C1C） */
 .dark {
-  /* 红色主色 #C20C0C 系列（网易云音乐风格） */
-  --color-primary: 194 12 12;
-  --color-primary-50: 252 233 233;
-  --color-primary-100: 250 220 220;
-  --color-primary-200: 245 188 188;
-  --color-primary-300: 240 155 155;
-  --color-primary-400: 232 70 70;
-  --color-primary-500: 194 12 12;
-  --color-primary-600: 168 10 10;
-  --color-primary-700: 142 8 8;
-  --color-primary-800: 116 7 7;
-  --color-primary-900: 90 5 5;
+  /* 红色主色 #B91C1C 系列（稳重不刺眼） */
+  --color-primary: 185 28 28;
+  --color-primary-50: 254 242 242;
+  --color-primary-100: 254 226 226;
+  --color-primary-200: 254 202 202;
+  --color-primary-300: 252 165 165;
+  --color-primary-400: 220 38 38;
+  --color-primary-500: 185 28 28;
+  --color-primary-600: 153 27 27;
+  --color-primary-700: 127 29 29;
+  --color-primary-800: 100 22 22;
+  --color-primary-900: 70 15 15;
 }
 
 :root {

@@ -380,18 +380,12 @@ def get_artist_avatar(artist_id: str, db: Session = Depends(get_db)):
         media_type = "image/png" if avatar.suffix.lower() == ".png" else "image/jpeg"
         return FileResponse(str(avatar), media_type=media_type)
 
-    # 回退：生成首字母 SVG
+    # 回退：生成首字母 SVG（透明背景，让前端父容器背景色透过显示）
     name = artist.name or "U"
     initial = name[0].upper() if name else "U"
     svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#31C27C"/>
-      <stop offset="100%" stop-color="#1A9B5F"/>
-    </linearGradient>
-  </defs>
-  <rect width="200" height="200" fill="url(#bg)"/>
-  <text x="100" y="100" font-size="100" font-family="sans-serif" fill="white" text-anchor="middle" dominant-baseline="central" font-weight="bold">{initial}</text>
+  <rect width="200" height="200" fill="transparent"/>
+  <text x="100" y="100" font-size="100" font-family="sans-serif" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central" font-weight="bold">{initial}</text>
 </svg>'''
     return Response(content=svg, media_type="image/svg+xml")
 
