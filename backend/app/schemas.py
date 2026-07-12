@@ -110,12 +110,27 @@ class SongListResponse(CamelModel):
 
 
 class SearchResultItem(CamelModel):
-    """搜索结果项（type 标识实体类型）。"""
+    """搜索结果项（type 标识实体类型）。
+
+    song 类型额外携带 format / duration / fileSize / bitrate / trackNumber
+    album 类型额外携带 year / songCount
+    artist 类型额外携带 albumCount / songCount
+    """
 
     type: str  # artist | album | song
     id: str
     name: str
     detail: Optional[str] = None
+    # 歌曲专属字段
+    format: Optional[str] = None
+    duration: Optional[float] = None
+    file_size: Optional[int] = None
+    bitrate: Optional[int] = None
+    track_number: Optional[int] = None
+    # 专辑/艺术家专属字段
+    year: Optional[int] = None
+    song_count: Optional[int] = None
+    album_count: Optional[int] = None
 
 
 class SearchResponse(CamelModel):

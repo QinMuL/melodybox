@@ -221,6 +221,8 @@ def search(
             items.append(SearchResultItem(
                 type="artist", id=a.id, name=a.name,
                 detail=f"{a.album_count} 张专辑 · {a.song_count} 首",
+                album_count=a.album_count,
+                song_count=a.song_count,
             ))
 
     if type in ("all", "album"):
@@ -241,6 +243,8 @@ def search(
             items.append(SearchResultItem(
                 type="album", id=al.id, name=al.title,
                 detail=f"{artist_name}" + (f" · {al.year}" if al.year else ""),
+                year=al.year,
+                song_count=al.song_count,
             ))
 
     if type in ("all", "song"):
@@ -257,6 +261,11 @@ def search(
             items.append(SearchResultItem(
                 type="song", id=s.id, name=s.title,
                 detail=f"{artist_name} · {album_title}",
+                format=s.format,
+                duration=s.duration,
+                file_size=s.file_size,
+                bitrate=s.bitrate,
+                track_number=s.track_number,
             ))
 
     return SearchResponse(items=items, total=len(items))

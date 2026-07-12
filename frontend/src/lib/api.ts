@@ -85,7 +85,20 @@ export const api = {
       withFallback(
         async () => {
           const res = await client.get<{
-            items: Array<{ type: string; id: string; name: string; detail?: string }>;
+            items: Array<{
+              type: string;
+              id: string;
+              name: string;
+              detail?: string;
+              format?: string;
+              duration?: number;
+              fileSize?: number;
+              bitrate?: number;
+              trackNumber?: number;
+              year?: number;
+              songCount?: number;
+              albumCount?: number;
+            }>;
             total: number;
           }>("/library/search", { params: { q } });
           const items = res.data.items;
@@ -110,6 +123,11 @@ export const api = {
             .map((i) => ({
               id: i.id,
               title: i.name,
+              format: i.format,
+              duration: i.duration,
+              fileSize: i.fileSize,
+              bitrate: i.bitrate,
+              trackNumber: i.trackNumber,
             } as unknown as Song));
           return { artists, albums, songs };
         },
