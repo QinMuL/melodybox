@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ChevronRight, Disc3, Music2, Search } from "lucide-react";
+import { ChevronRight, Disc3, Loader2, Music2, Search } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDuration, formatSize, formatBitrate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Album, Artist, Song } from "@/types";
+
+// 每页加载条数：个人音乐库一次加载较多，减少翻页次数
+const PAGE_SIZE = 200;
 
 /** 带回退的图片组件：加载失败时显示 children */
 function ImageWithFallback({
@@ -44,37 +47,87 @@ export default function Library() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // 分页状态：记录每个视图已加载的页数和总数
+  const [artistsPage, setArtistsPage] = useState(1);
+  const [artistsTotal, setArtistsTotal] = useState(0);
+  const [albumsPage, setAlbumsPage] = useState(1);
+  const [albumsTotal, setAlbumsTotal] = useState(0);
+  const [songsPage, setSongsPage] = useState(1);
+  const [songsTotal, setSongsTotal] = useState(0);
 
-  // 加载艺术家列表
+  // 加载艺术家列表（首页）
   useEffect(() => {
     setLoading(true);
-    api.library.artists(1, 100).then((res) => {
+    api.library.artists(1, PAGE_SIZE).then((res) => {
       setArtists(res.items);
+      setArtistsPage(1);
+      setArtistsTotal(res.total);
       setLoading(false);
     });
   }, []);
 
-  // 切换到专辑视图时加载全部专辑
+  // 切换到专辑视图时加载全部专辑（首页）
   useEffect(() => {
     if (view === "albums" && !selectedArtist) {
       setLoading(true);
-      api.library.allAlbums(1, 100).then((res) => {
+      api.library.allAlbums(1, PAGE_SIZE).then((res) => {
         setAlbums(res.items);
+        setAlbumsPage(1);
+        setAlbumsTotal(res.total);
         setLoading(false);
       });
     }
   }, [view, selectedArtist]);
 
-  // 切换到歌曲视图时加载全部歌曲
+  // 切换到歌曲视图时加载全部歌曲（首页）
   useEffect(() => {
     if (view === "songs" && !selectedAlbum) {
       setLoading(true);
-      api.library.allSongs(1, 200).then((res) => {
+      api.library.allSongs(1, PAGE_SIZE).then((res) => {
         setSongs(res.items);
+        setSongsPage(1);
+        setSongsTotal(res.total);
         setLoading(false);
       });
     }
   }, [view, selectedAlbum]);
+
+  // 加载更多艺术家
+  const loadMoreArtists = useCallback(() => {
+    setLoadingMore(true);
+    const next = artistsPage + 1;
+    api.library.artists(next, PAGE_SIZE).then((res) => {
+      setArtists((prev) => [...prev, ...res.items]);
+      setArtistsPage(next);
+      setArtistsTotal(res.total);
+      setLoadingMore(false);
+    });
+  }, [artistsPage]);
+
+  // 加载更多专辑
+  const loadMoreAlbums = useCallback(() => {
+    setLoadingMore(true);
+    const next = albumsPage + 1;
+    api.library.allAlbums(next, PAGE_SIZE).then((res) => {
+      setAlbums((prev) => [...prev, ...res.items]);
+      setAlbumsPage(next);
+      setAlbumsTotal(res.total);
+      setLoadingMore(false);
+    });
+  }, [albumsPage]);
+
+  // 加载更多歌曲
+  const loadMoreSongs = useCallback(() => {
+    setLoadingMore(true);
+    const next = songsPage + 1;
+    api.library.allSongs(next, PAGE_SIZE).then((res) => {
+      setSongs((prev) => [...prev, ...res.items]);
+      setSongsPage(next);
+      setSongsTotal(res.total);
+      setLoadingMore(false);
+    });
+  }, [songsPage]);
 
   const handleArtistClick = async (artist: Artist) => {
     setSelectedArtist(artist);
@@ -175,16 +228,81 @@ export default function Library() {
           ))}
         </div>
       ) : view === "artists" ? (
-        <ArtistGrid artists={artists} onClick={handleArtistClick} />
+        <>
+          <ArtistGrid artists={artists} onClick={handleArtistClick} />
+          {artists.length < artistsTotal && (
+            <LoadMoreButton
+              loaded={artists.length}
+              total={artistsTotal}
+              loading={loadingMore}
+              onClick={loadMoreArtists}
+            />
+          )}
+        </>
       ) : view === "albums" ? (
-        <AlbumGrid
-          albums={albums}
-          artistName={selectedArtist?.name}
-          onClick={handleAlbumClick}
-        />
+        <>
+          <AlbumGrid
+            albums={albums}
+            artistName={selectedArtist?.name}
+            onClick={handleAlbumClick}
+          />
+          {!selectedArtist && albums.length < albumsTotal && (
+            <LoadMoreButton
+              loaded={albums.length}
+              total={albumsTotal}
+              loading={loadingMore}
+              onClick={loadMoreAlbums}
+            />
+          )}
+        </>
       ) : (
-        <SongList songs={songs} albumTitle={selectedAlbum?.title} />
+        <>
+          <SongList songs={songs} albumTitle={selectedAlbum?.title} />
+          {!selectedAlbum && songs.length < songsTotal && (
+            <LoadMoreButton
+              loaded={songs.length}
+              total={songsTotal}
+              loading={loadingMore}
+              onClick={loadMoreSongs}
+            />
+          )}
+        </>
       )}
+    </div>
+  );
+}
+
+/** 加载更多按钮：当已加载数量少于总数时显示 */
+function LoadMoreButton({
+  loaded,
+  total,
+  loading,
+  onClick,
+}: {
+  loaded: number;
+  total: number;
+  loading: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 py-6">
+      <button
+        onClick={onClick}
+        disabled={loading}
+        className="inline-flex items-center gap-2 rounded-full border border-surface-border px-6 py-2.5 text-sm font-medium text-ink-secondary transition-colors hover:border-primary hover:text-primary disabled:opacity-50 dark:border-dark-border dark:text-ink-lightSecondary dark:hover:border-primary dark:hover:text-primary"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            加载中...
+          </>
+        ) : (
+          <>加载更多（剩余 {total - loaded} 项）</>
+        )}
+      </button>
+      <span className="text-xs text-ink-muted dark:text-ink-lightMuted">
+        已显示 {loaded} / {total}
+      </span>
     </div>
   );
 }
