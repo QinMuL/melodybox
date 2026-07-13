@@ -139,14 +139,14 @@ function OperationCard({ mode }: { mode: Mode }) {
         <div className="flex-1">
           <h2 className="text-lg font-semibold text-ink-primary dark:text-ink-light">{title}</h2>
           <p className="mt-1 text-sm text-ink-muted dark:text-ink-lightMuted">{desc}</p>
-          <div className="mt-2 rounded-lg bg-surface-light px-3 py-2 font-mono text-xs text-ink-secondary dark:bg-dark-hover dark:text-ink-lightSecondary">
+          <div className="mt-2 break-all rounded-lg bg-surface-light px-3 py-2 font-mono text-xs text-ink-secondary dark:bg-dark-hover dark:text-ink-lightSecondary">
             {example}
           </div>
         </div>
       </div>
 
       {/* 操作按钮 */}
-      <div className="mt-5 flex gap-3">
+      <div className="mt-5 flex flex-wrap gap-3">
         <button
           onClick={handlePreview}
           disabled={loading || executing}
@@ -179,7 +179,7 @@ function OperationCard({ mode }: { mode: Mode }) {
       {preview && !loading && (
         <div className="mt-5 space-y-4">
           {/* 顶部汇总统计 */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <StatCard
               label="总计"
               value={stats.total}

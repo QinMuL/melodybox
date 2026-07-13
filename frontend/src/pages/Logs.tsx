@@ -242,7 +242,7 @@ export default function Logs() {
 
       {/* 统计信息 */}
       {data && (
-        <div className="flex items-center gap-4 px-1 text-xs text-ink-muted">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-ink-muted">
           <span>共 {data.total} 条</span>
           <span>文件大小: {formatSize(data.fileSize)}</span>
           <span className="truncate">文件: {data.file}</span>
@@ -292,7 +292,7 @@ export default function Logs() {
                         {entry.level}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-2 py-1.5 font-mono text-ink-muted">
+                    <td className="hidden whitespace-nowrap px-2 py-1.5 font-mono text-ink-muted sm:table-cell">
                       {entry.logger || "—"}
                     </td>
                     <td className="px-2 py-1.5 font-mono text-ink-primary break-all dark:text-ink-light">
