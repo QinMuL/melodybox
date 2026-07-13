@@ -393,45 +393,30 @@ async def run_organize_task(
 
     # 扫描文件
     files = find_audio_files(input_dir, exclude_patterns)
-    total = len(files)
+    scan_total = len(files)
 
     action_desc = "重命名" if mode == "rename" else "整理归类"
-    logger.info("开始%s任务，共 %d 个文件", action_desc, total)
+    logger.info("开始%s任务，扫描到 %d 个文件", action_desc, scan_total)
 
     db = db_session_factory()
     try:
-        # 更新任务记录初始状态
-        task = db.query(OrganizeTask).filter(OrganizeTask.id == task_id).first()
-        if task is not None:
-            task.status = "running"
-            task.started_at = datetime.now()
-            task.total_files = total
-            task.processed_files = 0
-            task.progress = 0.0
-            db.commit()
-
-        await task_manager.update_progress(
-            task_id,
-            progress=0.0,
-            total_files=total,
-            processed_files=0,
-            current_file=None,
-        )
-        await task_manager.send_log(
-            task_id, "info", f"开始{action_desc}任务，共 {total} 个文件"
-        )
-
         # 从数据库加载元数据缓存，避免逐个读取音频文件（FLAC 解析很慢）
         meta_cache = _load_metadata_cache(db)
         logger.info(
             "整理任务：数据库缓存 %d 条元数据，磁盘文件 %d 个",
-            len(meta_cache), total,
+            len(meta_cache), scan_total,
         )
         disk_reads = 0
 
         loop = asyncio.get_event_loop()
+
+        # 预筛选：只保留需要实际操作的文件。
+        # 已符合规范的文件（source == target）直接计入跳过，不进入处理循环，
+        # 避免对整个资源库逐个调用执行器、更新进度和写库（这是之前慢的根因）。
+        pending: List[tuple] = []  # (file_path, final_target, action, reason)
+        pre_skipped = 0
         with ThreadPoolExecutor(max_workers=4) as executor:
-            for idx, file_path in enumerate(files, start=1):
+            for file_path in files:
                 # 优先使用数据库缓存，未入库时回退到磁盘读取
                 metadata = meta_cache.get(file_path)
                 if metadata is None:
@@ -443,10 +428,61 @@ async def run_organize_task(
                 target = _compute_target(
                     file_path, metadata, mode, output_dir, naming_template
                 )
+                # 源与目标一致 → 已符合规范，直接跳过，不进入处理循环
+                if os.path.abspath(file_path) == os.path.abspath(target):
+                    pre_skipped += 1
+                    continue
                 final_target, action, reason = _decide_target(
                     file_path, target, move, policy
                 )
+                if action == "skip":
+                    pre_skipped += 1
+                else:
+                    pending.append((file_path, final_target, action, reason))
 
+        if disk_reads > 0:
+            logger.info(
+                "整理任务：从磁盘读取了 %d 个未入库文件的元数据", disk_reads
+            )
+
+        total = scan_total
+        skipped = pre_skipped
+        pending_count = len(pending)
+        logger.info(
+            "预筛选完成：需处理 %d 个，跳过 %d 个（已符合规范或冲突跳过）",
+            pending_count, pre_skipped,
+        )
+
+        # 更新任务记录初始状态。
+        # total 仍为扫描到的全部文件数（保证 moved+copied+skipped+failed=total），
+        # processed 从 pre_skipped 起算（已符合规范的文件视为已处理），进度条立即反映真实情况。
+        task = db.query(OrganizeTask).filter(OrganizeTask.id == task_id).first()
+        init_progress = (pre_skipped / total * 100) if total else 100.0
+        if task is not None:
+            task.status = "running"
+            task.started_at = datetime.now()
+            task.total_files = total
+            task.processed_files = pre_skipped
+            task.progress = init_progress
+            db.commit()
+
+        await task_manager.update_progress(
+            task_id,
+            progress=init_progress,
+            total_files=total,
+            processed_files=pre_skipped,
+            current_file=None,
+        )
+        await task_manager.send_log(
+            task_id, "info",
+            f"开始{action_desc}任务，共 {total} 个文件，需处理 {pending_count} 个，跳过 {pre_skipped} 个已符合规范",
+        )
+
+        # 只处理需要实际操作的文件（预筛选已剔除已符合规范的文件）
+        processed = pre_skipped
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            for file_path, final_target, action, reason in pending:
+                processed += 1
                 # 执行文件操作
                 final_target, err = await loop.run_in_executor(
                     executor,
@@ -502,26 +538,21 @@ async def run_organize_task(
                     copied += 1
 
                 # 更新进度
-                progress = (idx / total * 100) if total else 100.0
+                progress = (processed / total * 100) if total else 100.0
                 await task_manager.update_progress(
                     task_id,
                     progress=progress,
                     total_files=total,
-                    processed_files=idx,
+                    processed_files=processed,
                     current_file=file_path,
                 )
 
                 # 持久化进度
                 if task is not None:
-                    task.processed_files = idx
+                    task.processed_files = processed
                     task.progress = progress
                     task.current_file = file_path
                     db.commit()
-
-        if disk_reads > 0:
-            logger.info(
-                "整理任务：从磁盘读取了 %d 个未入库文件的元数据", disk_reads
-            )
 
         # 清理空目录（仅 move 模式，copy 保留原文件不产生空目录）
         dirs_cleaned = 0
@@ -533,6 +564,46 @@ async def run_organize_task(
                 )
                 logger.info("清理空目录 %d 个", dirs_cleaned)
 
+        # 自动触发扫描刷新：重命名/整理后文件路径变化，
+        # 重新扫描入库以更新数据库中的 file_path，保持元数据缓存有效，
+        # 避免下次预览/整理因缓存失效回退到逐个磁盘读取元数据。
+        refreshed = 0
+        if (moved + copied) > 0:
+            await task_manager.send_log(
+                task_id, "info", "文件操作完成，正在刷新音乐库索引..."
+            )
+            # 扫描在独立线程 + 独立 DB 会话中执行（SQLAlchemy 会话非线程安全）
+            scan_db = db_session_factory()
+            try:
+                from app.services.scan_service import scan_directory
+
+                indexed, scan_total, scan_skipped = await loop.run_in_executor(
+                    None,
+                    scan_directory,
+                    scan_db,
+                    input_dir,
+                    exclude_patterns,
+                    False,  # compute_hash
+                    None,   # on_progress
+                )
+                refreshed = indexed
+                logger.info(
+                    "整理后自动扫描刷新：共 %d 个文件，新入库 %d 个，跳过 %d 个",
+                    scan_total, indexed, scan_skipped,
+                )
+                await task_manager.send_log(
+                    task_id, "info",
+                    f"音乐库索引已刷新：共 {scan_total} 个文件，更新 {indexed} 条",
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("整理后自动扫描刷新失败: %s", exc)
+                await task_manager.send_log(
+                    task_id, "warning",
+                    f"自动扫描刷新失败: {exc}（不影响文件操作结果）",
+                )
+            finally:
+                scan_db.close()
+
         # 任务完成
         result = {
             "mode": mode,
@@ -542,6 +613,7 @@ async def run_organize_task(
             "failed": failed,
             "total": total,
             "dirsCleaned": dirs_cleaned,
+            "refreshed": refreshed,
         }
         if task is not None:
             task.status = "completed"
