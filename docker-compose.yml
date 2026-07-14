@@ -29,7 +29,8 @@ services:
       - CONFIG_FILE=/app/data/config.json
       - LOG_LEVEL=info
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:28080/health"]
+      # 使用容器内已有的 python 做健康检查，避免依赖 curl
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:28080/health').close()"]
       interval: 30s
       timeout: 5s
       retries: 3
